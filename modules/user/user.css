@@ -1,4 +1,4 @@
-/* $Id: user.css,v 1.11 2009/06/14 08:04:25 dries Exp $ */
+/* $Id: user.css,v 1.7 2007/06/21 04:38:41 unconed Exp $ */
 
 #permissions td.module {
   font-weight: bold;
@@ -6,8 +6,15 @@
 #permissions td.permission {
   padding-left: 1.5em; /* LTR */
 }
-#permissions tr.odd .form-item, #permissions tr.even .form-item {
-  white-space: normal;
+#access-rules .access-type, #access-rules .rule-type {
+  margin-right: 1em; /* LTR */
+  float: left; /* LTR */
+}
+#access-rules .access-type .form-item, #access-rules .rule-type .form-item {
+  margin-top: 0;
+}
+#access-rules .mask {
+  clear: both;
 }
 #user-login-form {
   text-align: center;
@@ -23,7 +30,7 @@
   margin-left: 0.5em; /* LTR */
   clear: right; /* LTR */
 }
-#user-admin-settings fieldset .fieldset-description {
+#user-admin-settings fieldset .description {
   font-size: 0.85em;
   padding-bottom: .5em;
 }

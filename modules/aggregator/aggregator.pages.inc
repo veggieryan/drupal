@@ -1,5 +1,5 @@
 <?php
-// $Id: aggregator.pages.inc,v 1.29 2009/06/15 09:49:58 dries Exp $
+// $Id: aggregator.pages.inc,v 1.12.2.1 2008/08/16 21:13:48 dries Exp $
 
 /**
  * @file
@@ -13,9 +13,9 @@
  *   The items HTML.
  */
 function aggregator_page_last() {
-  drupal_add_feed(url('aggregator/rss'), variable_get('site_name', 'Drupal') . ' ' . t('aggregator'));
+  drupal_add_feed(url('aggregator/rss'), variable_get('site_name', 'Drupal') .' '. t('aggregator'));
 
-  $items = aggregator_feed_items_load('sum');
+  $items = aggregator_feed_items_load('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_item} i INNER JOIN {aggregator_feed} f ON i.fid = f.fid ORDER BY i.timestamp DESC, i.iid DESC');
 
   return _aggregator_page_list($items, arg(1));
 }
@@ -30,18 +30,19 @@ function aggregator_page_last() {
  * @param $arg2
  *   If there are two arguments then $arg2 is feed.
  * @return
- *   The item's HTML.
+ *   The items HTML.
  */
 function aggregator_page_source($arg1, $arg2 = NULL) {
   // If there are two arguments then this function is the categorize form, and
   // $arg1 is $form_state and $arg2 is $feed. Otherwise, $arg1 is $feed.
-  $feed = is_object($arg2) ? $arg2 : $arg1;
-  drupal_set_title($feed->title);
+  $feed = is_array($arg2) ? $arg2 : $arg1;
+  $feed = (object)$feed;
+  drupal_set_title(check_plain($feed->title));
   $feed_source = theme('aggregator_feed_source', $feed);
 
   // It is safe to include the fid in the query because it's loaded from the
   // database by aggregator_feed_load.
-  $items = aggregator_feed_items_load('source', $feed);
+  $items = aggregator_feed_items_load('SELECT * FROM {aggregator_item} WHERE fid = '. $feed->fid .' ORDER BY timestamp DESC, iid DESC');
 
   return _aggregator_page_list($items, arg(3), $feed_source);
 }
@@ -63,45 +64,36 @@ function aggregator_page_category($arg1, $arg2 = NULL) {
   // $form_state and $arg2 is $category. Otherwise, $arg1 is $category.
   $category = is_array($arg2) ? $arg2 : $arg1;
 
-  drupal_add_feed(url('aggregator/rss/' . $category['cid']), variable_get('site_name', 'Drupal') . ' ' . t('aggregator - @title', array('@title' => $category['title'])));
+  drupal_add_feed(url('aggregator/rss/'. $category['cid']), variable_get('site_name', 'Drupal') .' '. t('aggregator - @title', array('@title' => $category['title'])));
 
   // It is safe to include the cid in the query because it's loaded from the
   // database by aggregator_category_load.
-  $items = aggregator_feed_items_load('category', $category);
+  $items = aggregator_feed_items_load('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_category_item} c LEFT JOIN {aggregator_item} i ON c.iid = i.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE cid = '. $category['cid'] .' ORDER BY timestamp DESC, i.iid DESC');
 
   return _aggregator_page_list($items, arg(3));
 }
 
 /**
- * Load feed items
+ * Load feed items by passing a SQL query.
  *
- * @param $type
- *   The filter for the items. Possible values: 'sum', 'source', 'category'
- * @param $data
- *   Feed or category data for filtering
+ * @param $sql
+ *   The query to be executed.
  * @return
  *   An array of the feed items.
  */
-function aggregator_feed_items_load($type, $data = NULL) {
+function aggregator_feed_items_load($sql) {
   $items = array();
-  $range_limit = 20;
-  switch ($type) {
-    case 'sum':
-      $result = db_query_range('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_item} i INNER JOIN {aggregator_feed} f ON i.fid = f.fid ORDER BY i.timestamp DESC, i.iid DESC', 0, $range_limit);
-      break;
-    case 'source':
-      $result = db_query_range('SELECT * FROM {aggregator_item} WHERE fid = :fid ORDER BY timestamp DESC, iid DESC', array(':fid' => $data->fid), 0, $range_limit);
-      break;
-    case 'category':
-      $result = db_query_range('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_category_item} c LEFT JOIN {aggregator_item} i ON c.iid = i.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE cid = :cid ORDER BY timestamp DESC, i.iid DESC', array(':cid' => $data['cid']), 0, $range_limit);
-      break;
+  if (isset($sql)) {
+    $result = pager_query($sql, 20);
+    while ($item = db_fetch_object($result)) {
+      $result_category = db_query('SELECT c.title, c.cid FROM {aggregator_category_item} ci LEFT JOIN {aggregator_category} c ON ci.cid = c.cid WHERE ci.iid = %d ORDER BY c.title', $item->iid);
+      $item->categories = array();
+      while ($item_categories = db_fetch_object($result_category)) {
+        $item->categories[] = $item_categories;
+      }
+      $items[$item->iid] = $item;
+    }
   }
-
-  foreach ($result as $item) {
-    $item->categories = db_query('SELECT c.title, c.cid FROM {aggregator_category_item} ci LEFT JOIN {aggregator_category} c ON ci.cid = c.cid WHERE ci.iid = :iid ORDER BY c.title', array(':iid' => $item->iid))->fetchAll();
-    $items[] = $item;
-  }
-
   return $items;
 }
 
@@ -132,7 +124,6 @@ function _aggregator_page_list($items, $op, $feed_source = '') {
     }
     $output = theme('aggregator_wrapper', $output);
   }
-
   return $output;
 }
 
@@ -153,21 +144,17 @@ function aggregator_categorize_items($items, $feed_source = '') {
   $form['#submit'][] = 'aggregator_categorize_items_submit';
   $form['#validate'][] = 'aggregator_categorize_items_validate';
   $form['#theme'] = 'aggregator_categorize_items';
-  $form['feed_source'] = array(
-    '#value' => $feed_source,
-  );
+  $form['feed_source'] = array('#value' => $feed_source);
   $categories = array();
   $done = FALSE;
   $form['items'] = array();
-  $form['categories'] = array(
-    '#tree' => TRUE,
-  );
+  $form['categories'] = array('#tree' => TRUE);
   foreach ($items as $item) {
-    $form['items'][$item->iid] = array('#markup' => theme('aggregator_item', $item));
+    $form['items'][$item->iid] = array('#value' => theme('aggregator_item', $item));
     $form['categories'][$item->iid] = array();
-    $categories_result = db_query('SELECT c.cid, c.title, ci.iid FROM {aggregator_category} c LEFT JOIN {aggregator_category_item} ci ON c.cid = ci.cid AND ci.iid = :iid', array(':iid' => $item->iid));
+    $categories_result = db_query('SELECT c.cid, c.title, ci.iid FROM {aggregator_category} c LEFT JOIN {aggregator_category_item} ci ON c.cid = ci.cid AND ci.iid = %d', $item->iid);
     $selected = array();
-    foreach ($categories_result as $category) {
+    while ($category = db_fetch_object($categories_result)) {
       if (!$done) {
         $categories[$category->cid] = check_plain($category->title);
       }
@@ -190,7 +177,7 @@ function aggregator_categorize_items($items, $feed_source = '') {
 }
 
 /**
- * Validate aggregator_categorize_items() form submissions.
+ * Validate aggregator_categorize_items form submissions.
  */
 function aggregator_categorize_items_validate($form, &$form_state) {
   if (!user_access('administer news feeds')) {
@@ -199,27 +186,16 @@ function aggregator_categorize_items_validate($form, &$form_state) {
 }
 
 /**
- * Process aggregator_categorize_items() form submissions.
+ * Process aggregator_categorize_items form submissions.
  */
 function aggregator_categorize_items_submit($form, &$form_state) {
   if (!empty($form_state['values']['categories'])) {
     foreach ($form_state['values']['categories'] as $iid => $selection) {
-      db_delete('aggregator_category_item')
-        ->condition('iid', $iid)
-        ->execute();
-      $insert = db_insert('aggregator_category_item')->fields(array('iid', 'cid'));
-      $has_values = FALSE;
+      db_query('DELETE FROM {aggregator_category_item} WHERE iid = %d', $iid);
       foreach ($selection as $cid) {
-        if ($cid && $iid) {
-          $has_values = TRUE;
-          $insert->values(array(
-            'iid' => $iid,
-            'cid' => $cid,
-          ));
+        if ($cid) {
+          db_query('INSERT INTO {aggregator_category_item} (cid, iid) VALUES (%d, %d)', $cid, $iid);
         }
-      }
-      if ($has_values) {
-        $insert->execute();
       }
     }
   }
@@ -238,18 +214,19 @@ function aggregator_categorize_items_submit($form, &$form_state) {
 function theme_aggregator_categorize_items($form) {
   $output = drupal_render($form['feed_source']);
   $rows = array();
-  if (!empty($form['items'])) {
+  if ($form['items']) {
     foreach (element_children($form['items']) as $key) {
-      $rows[] = array(
-        drupal_render($form['items'][$key]),
-        array('data' => drupal_render($form['categories'][$key]), 'class' => 'categorize-item'),
-      );
+      if (is_array($form['items'][$key])) {
+        $rows[] = array(
+          drupal_render($form['items'][$key]),
+          array('data' => drupal_render($form['categories'][$key]), 'class' => 'categorize-item'),
+        );
+      }
     }
   }
   $output .= theme('table', array('', t('Categorize')), $rows);
   $output .= drupal_render($form['submit']);
-  $output .= drupal_render_children($form);
-
+  $output .= drupal_render($form);
   return theme('aggregator_wrapper', $output);
 }
 
@@ -259,7 +236,7 @@ function theme_aggregator_categorize_items($form) {
  * @see aggregator-wrapper.tpl.php
  */
 function template_preprocess_aggregator_wrapper(&$variables) {
-  $variables['pager'] = theme('pager', NULL);
+  $variables['pager'] = theme('pager', NULL, 20, 0);
 }
 
 /**
@@ -281,7 +258,7 @@ function template_preprocess_aggregator_item(&$variables) {
     $variables['source_title'] = check_plain($item->ftitle);
   }
   if (date('Ymd', $item->timestamp) == date('Ymd')) {
-    $variables['source_date'] = t('%ago ago', array('%ago' => format_interval(REQUEST_TIME - $item->timestamp)));
+    $variables['source_date'] = t('%ago ago', array('%ago' => format_interval(time() - $item->timestamp)));
   }
   else {
     $variables['source_date'] = format_date($item->timestamp, 'custom', variable_get('date_format_medium', 'D, m/d/Y - H:i'));
@@ -289,7 +266,7 @@ function template_preprocess_aggregator_item(&$variables) {
 
   $variables['categories'] = array();
   foreach ($item->categories as $category) {
-    $variables['categories'][$category->cid] = l($category->title, 'aggregator/categories/' . $category->cid);
+    $variables['categories'][$category->cid] = l($category->title, 'aggregator/categories/'. $category->cid);
   }
 }
 
@@ -300,16 +277,16 @@ function aggregator_page_sources() {
   $result = db_query('SELECT f.fid, f.title, f.description, f.image, MAX(i.timestamp) AS last FROM {aggregator_feed} f LEFT JOIN {aggregator_item} i ON f.fid = i.fid GROUP BY f.fid, f.title, f.description, f.image ORDER BY last DESC, f.title');
 
   $output = '';
-  foreach ($result as $feed) {
+  while ($feed = db_fetch_object($result)) {
     // Most recent items:
     $summary_items = array();
     if (variable_get('aggregator_summary_items', 3)) {
-      $items = db_query_range('SELECT i.title, i.timestamp, i.link FROM {aggregator_item} i WHERE i.fid = :fid ORDER BY i.timestamp DESC', array(':fid' => $feed->fid), 0, variable_get('aggregator_summary_items', 3));
-      foreach ($items as $item) {
+      $items = db_query_range('SELECT i.title, i.timestamp, i.link FROM {aggregator_item} i WHERE i.fid = %d ORDER BY i.timestamp DESC', $feed->fid, 0, variable_get('aggregator_summary_items', 3));
+      while ($item = db_fetch_object($items)) {
         $summary_items[] = theme('aggregator_summary_item', $item);
       }
     }
-    $feed->url = url('aggregator/sources/' . $feed->fid);
+    $feed->url = url('aggregator/sources/'. $feed->fid);
     $output .= theme('aggregator_summary_items', $summary_items, $feed);
   }
   $output .= theme('feed_icon', url('aggregator/opml'), t('OPML feed'));
@@ -324,15 +301,15 @@ function aggregator_page_categories() {
   $result = db_query('SELECT c.cid, c.title, c.description FROM {aggregator_category} c LEFT JOIN {aggregator_category_item} ci ON c.cid = ci.cid LEFT JOIN {aggregator_item} i ON ci.iid = i.iid GROUP BY c.cid, c.title, c.description');
 
   $output = '';
-  foreach ($result as $category) {
+  while ($category = db_fetch_object($result)) {
     if (variable_get('aggregator_summary_items', 3)) {
       $summary_items = array();
-      $items = db_query_range('SELECT i.title, i.timestamp, i.link, f.title as feed_title, f.link as feed_link FROM {aggregator_category_item} ci LEFT JOIN {aggregator_item} i ON i.iid = ci.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE ci.cid = :cid ORDER BY i.timestamp DESC', array(':cid' => $category->cid), 0, variable_get('aggregator_summary_items', 3));
-      foreach ($items as $item) {
+      $items = db_query_range('SELECT i.title, i.timestamp, i.link, f.title as feed_title, f.link as feed_link FROM {aggregator_category_item} ci LEFT JOIN {aggregator_item} i ON i.iid = ci.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE ci.cid = %d ORDER BY i.timestamp DESC', $category->cid, 0, variable_get('aggregator_summary_items', 3));
+      while ($item = db_fetch_object($items)) {
         $summary_items[] = theme('aggregator_summary_item', $item);
       }
     }
-    $category->url = url('aggregator/categories/' . $category->cid);
+    $category->url = url('aggregator/categories/'. $category->cid);
     $output .= theme('aggregator_summary_items', $summary_items, $category);
   }
 
@@ -344,18 +321,23 @@ function aggregator_page_categories() {
  */
 function aggregator_page_rss() {
   $result = NULL;
-  // arg(2) is the passed cid, only select for that category.
+  // arg(2) is the passed cid, only select for that category
   if (arg(2)) {
-    $category = db_query('SELECT cid, title FROM {aggregator_category} WHERE cid = :cid', array(':cid' => arg(2)))->fetchObject();
-    $result = db_query_range('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_category_item} c LEFT JOIN {aggregator_item} i ON c.iid = i.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE cid = :cid ORDER BY timestamp DESC, i.iid DESC', array(':cid' => $category->cid), 0, variable_get('feed_default_items', 10));
+    $category = db_fetch_object(db_query('SELECT cid, title FROM {aggregator_category} WHERE cid = %d', arg(2)));
+    $sql = 'SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_category_item} c LEFT JOIN {aggregator_item} i ON c.iid = i.iid LEFT JOIN {aggregator_feed} f ON i.fid = f.fid WHERE cid = %d ORDER BY timestamp DESC, i.iid DESC';
+    $result = db_query_range($sql, $category->cid, 0, variable_get('feed_default_items', 10));
   }
-  // Or, get the default aggregator items.
+  // or, get the default aggregator items
   else {
     $category = NULL;
-    $result = db_query_range('SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_item} i INNER JOIN {aggregator_feed} f ON i.fid = f.fid ORDER BY i.timestamp DESC, i.iid DESC', 0, variable_get('feed_default_items', 10));
+    $sql = 'SELECT i.*, f.title AS ftitle, f.link AS flink FROM {aggregator_item} i INNER JOIN {aggregator_feed} f ON i.fid = f.fid ORDER BY i.timestamp DESC, i.iid DESC';
+    $result = db_query_range($sql, 0, variable_get('feed_default_items', 10));
   }
 
-  $feeds = $result->fetchAll();
+  $feeds = array();
+  while ($item = db_fetch_object($result)) {
+    $feeds[] = $item;
+  }
   return theme('aggregator_page_rss', $feeds, $category);
 }
 
@@ -369,31 +351,31 @@ function aggregator_page_rss() {
  * @ingroup themeable
  */
 function theme_aggregator_page_rss($feeds, $category = NULL) {
-  drupal_set_header('Content-Type', 'application/rss+xml; charset=utf-8');
+  drupal_set_header('Content-Type: application/rss+xml; charset=utf-8');
 
   $items = '';
   $feed_length = variable_get('feed_item_length', 'teaser');
   foreach ($feeds as $feed) {
     switch ($feed_length) {
       case 'teaser':
-        $summary = text_summary($feed->description, NULL, variable_get('aggregator_teaser_length', 600));
-        if ($summary != $feed->description) {
-          $summary .= '<p><a href="' . check_url($feed->link) . '">' . t('read more') . "</a></p>\n";
+        $teaser = node_teaser($feed->description);
+        if ($teaser != $feed->description) {
+          $teaser .= '<p><a href="'. check_url($feed->link) .'">'. t('read more') ."</a></p>\n";
         }
-        $feed->description = $summary;
+        $feed->description = $teaser;
         break;
       case 'title':
         $feed->description = '';
         break;
     }
-    $items .= format_rss_item($feed->ftitle . ': ' . $feed->title, $feed->link, $feed->description, array('pubDate' => date('r', $feed->timestamp)));
+    $items .= format_rss_item($feed->ftitle .': '. $feed->title, $feed->link, $feed->description, array('pubDate' => date('r', $feed->timestamp)));
   }
 
   $site_name = variable_get('site_name', 'Drupal');
-  $url = url((isset($category) ? 'aggregator/categories/' . $category->cid : 'aggregator'), array('absolute' => TRUE));
+  $url = url((isset($category) ? 'aggregator/categories/'. $category->cid : 'aggregator'), array('absolute' => TRUE));
   $description = isset($category) ? t('@site_name - aggregated feeds in category @title', array('@site_name' => $site_name, '@title' => $category->title)) : t('@site_name - aggregated feeds', array('@site_name' => $site_name));
 
-  $output  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+  $output = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
   $output .= "<rss version=\"2.0\">\n";
   $output .= format_rss_channel(t('@site_name aggregator', array('@site_name' => $site_name)), $url, $description, $items);
   $output .= "</rss>\n";
@@ -411,13 +393,17 @@ function theme_aggregator_page_rss($feeds, $category = NULL) {
  */
 function aggregator_page_opml($cid = NULL) {
   if ($cid) {
-    $result = db_query('SELECT f.title, f.url FROM {aggregator_feed} f LEFT JOIN {aggregator_category_feed} c on f.fid = c.fid WHERE c.cid = :cid ORDER BY title', array(':cid' => $cid));
+    $result = db_query('SELECT f.title, f.url FROM {aggregator_feed} f LEFT JOIN {aggregator_category_feed} c on f.fid = c.fid WHERE c.cid = %d ORDER BY title', $cid);
   }
   else {
     $result = db_query('SELECT * FROM {aggregator_feed} ORDER BY title');
   }
 
-  $feeds = $result->fetchAll();
+  $feeds = array();
+  while ($item = db_fetch_object($result)) {
+    $feeds[] = $item;
+  }
+
   return theme('aggregator_page_opml', $feeds);
 }
 
@@ -429,17 +415,18 @@ function aggregator_page_opml($cid = NULL) {
  * @ingroup themeable
  */
 function theme_aggregator_page_opml($feeds) {
-  drupal_set_header('Content-Type', 'text/xml; charset=utf-8');
 
-  $output  = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+  drupal_set_header('Content-Type: text/xml; charset=utf-8');
+
+  $output = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
   $output .= "<opml version=\"1.1\">\n";
   $output .= "<head>\n";
-  $output .= '<title>' . check_plain(variable_get('site_name', 'Drupal')) . "</title>\n";
-  $output .= '<dateModified>' . gmdate('r') . "</dateModified>\n";
+  $output .= '<title>'. check_plain(variable_get('site_name', 'Drupal')) ."</title>\n";
+  $output .= '<dateModified>'. gmdate('r') ."</dateModified>\n";
   $output .= "</head>\n";
   $output .= "<body>\n";
   foreach ($feeds as $feed) {
-    $output .= '<outline text="' . check_plain($feed->title) . '" xmlUrl="' . check_url($feed->url) . "\" />\n";
+    $output .= '<outline text="'. check_plain($feed->title) .'" xmlUrl="'. check_url($feed->url) ."\" />\n";
   }
   $output .= "</body>\n";
   $output .= "</opml>\n";
@@ -468,7 +455,7 @@ function template_preprocess_aggregator_summary_item(&$variables) {
 
   $variables['feed_url'] = check_url($item->link);
   $variables['feed_title'] = check_plain($item->title);
-  $variables['feed_age'] = t('%age old', array('%age' => format_interval(REQUEST_TIME - $item->timestamp)));
+  $variables['feed_age'] = t('%age old', array('%age' => format_interval(time() - $item->timestamp)));
 
   $variables['source_url'] = '';
   $variables['source_title'] = '';
@@ -492,7 +479,7 @@ function template_preprocess_aggregator_feed_source(&$variables) {
   $variables['source_url'] = check_url(url($feed->link, array('absolute' => TRUE)));
 
   if ($feed->checked) {
-    $variables['last_checked'] = t('@time ago', array('@time' => format_interval(REQUEST_TIME - $feed->checked)));
+    $variables['last_checked'] = t('@time ago', array('@time' => format_interval(time() - $feed->checked)));
   }
   else {
     $variables['last_checked'] = t('never');

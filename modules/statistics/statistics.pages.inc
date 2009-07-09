@@ -1,5 +1,5 @@
 <?php
-// $Id: statistics.pages.inc,v 1.13 2009/05/22 11:33:18 dries Exp $
+// $Id: statistics.pages.inc,v 1.2.2.1 2009/04/27 12:08:29 goba Exp $
 
 /**
  * @file
@@ -15,36 +15,23 @@ function statistics_node_tracker() {
         array('data' => t('User'), 'field' => 'u.name'),
         array('data' => t('Operations')));
 
-    $query = db_select('accesslog', 'a')->extend('PagerDefault')->extend('TableSort');
-    $query->join('users', 'u', 'a.uid = u.uid');
-
-    $query
-      ->fields('a', array('aid', 'timestamp', 'url', 'uid'))
-      ->fields('u', array('name'))
-      ->condition(db_or()
-        ->condition('a.path', 'node/' . $node->nid)
-        ->condition('a.path', 'node/' . $node->nid . '/%', 'LIKE'))
-      ->limit(30)
-      ->orderByHeader($header);
-
-    $result = $query->execute();
+    $result = pager_query("SELECT a.aid, a.timestamp, a.url, a.uid, u.name FROM {accesslog} a LEFT JOIN {users} u ON a.uid = u.uid WHERE a.path = 'node/%d' OR a.path LIKE 'node/%d/%%'". tablesort_sql($header), 30, 0, NULL, $node->nid, $node->nid);
     $rows = array();
-    foreach ($result as $log) {
+    while ($log = db_fetch_object($result)) {
       $rows[] = array(
         array('data' => format_date($log->timestamp, 'small'), 'class' => 'nowrap'),
         _statistics_link($log->url),
         theme('username', $log),
-        l(t('details'), "admin/reports/access/$log->aid"),
-      );
+        l(t('details'), "admin/reports/access/$log->aid"));
     }
 
     if (empty($rows)) {
       $rows[] = array(array('data' => t('No statistics available.'), 'colspan' => 4));
     }
 
-    drupal_set_title($node->title);
+    drupal_set_title(check_plain($node->title));
     $output = theme('table', $header, $rows);
-    $output .= theme('pager', NULL);
+    $output .= theme('pager', NULL, 30, 0);
     return $output;
   }
   else {
@@ -53,22 +40,16 @@ function statistics_node_tracker() {
 }
 
 function statistics_user_tracker() {
-  if ($account = user_load(arg(1))) {
+  if ($account = user_load(array('uid' => arg(1)))) {
 
     $header = array(
         array('data' => t('Timestamp'), 'field' => 'timestamp', 'sort' => 'desc'),
         array('data' => t('Page'), 'field' => 'path'),
         array('data' => t('Operations')));
-    $query = db_select('accesslog', 'a')->extend('PagerDefault')->extend('TableSort');
-    $query
-      ->fields('a', array('aid', 'timestamp', 'path', 'title'))
-      ->condition('uid', $account->uid)
-      ->limit(30)
-      ->orderByHeader($header);
 
-    $result = $query->execute();
+    $result = pager_query('SELECT aid, timestamp, path, title FROM {accesslog} WHERE uid = %d'. tablesort_sql($header), 30, 0, NULL, $account->uid);
     $rows = array();
-    foreach ($result as $log) {
+    while ($log = db_fetch_object($result)) {
       $rows[] = array(
         array('data' => format_date($log->timestamp, 'small'), 'class' => 'nowrap'),
         _statistics_format_item($log->title, $log->path),
@@ -79,9 +60,9 @@ function statistics_user_tracker() {
       $rows[] = array(array('data' => t('No statistics available.'), 'colspan' => 3));
     }
 
-    drupal_set_title($account->name);
+    drupal_set_title(check_plain($account->name));
     $output = theme('table', $header, $rows);
-    $output .= theme('pager', NULL);
+    $output .= theme('pager', NULL, 30, 0);
     return $output;
   }
   else {

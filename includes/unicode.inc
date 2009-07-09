@@ -1,5 +1,5 @@
 <?php
-// $Id: unicode.inc,v 1.39 2009/05/24 17:39:30 dries Exp $
+// $Id: unicode.inc,v 1.29 2007/12/28 12:02:50 dries Exp $
 
 /**
  * Indicates an error during check for PHP unicode support.
@@ -41,6 +41,12 @@ function _unicode_check() {
 
   // Set the standard C locale to ensure consistent, ASCII-only string handling.
   setlocale(LC_CTYPE, 'C');
+
+  // Check for outdated PCRE library
+  // Note: we check if U+E2 is in the range U+E0 - U+E1. This test returns TRUE on old PCRE versions.
+  if (preg_match('/[à-á]/u', 'â')) {
+    return array(UNICODE_ERROR, $t('The PCRE library in your PHP installation is outdated. This will cause problems when handling Unicode text. If you are running PHP 4.3.3 or higher, make sure you are using the PCRE library supplied by PHP. Please refer to the <a href="@url">PHP PCRE documentation</a> for more information.', array('@url' => 'http://www.php.net/pcre')));
+  }
 
   // Check for mbstring extension
   if (!function_exists('mb_strlen')) {
@@ -115,7 +121,7 @@ function unicode_requirements() {
  * @param &$data
  *   The XML data which will be parsed later.
  * @return
- *   An XML parser object or FALSE on error.
+ *   An XML parser object.
  */
 function drupal_xml_parser_create(&$data) {
   // Default XML encoding is UTF-8
@@ -129,7 +135,7 @@ function drupal_xml_parser_create(&$data) {
   }
 
   // Check for an encoding declaration in the XML prolog if no BOM was found.
-  if (!$bom && preg_match('/^<\?xml[^>]+encoding="(.+?)"/', $data, $match)) {
+  if (!$bom && ereg('^<\?xml[^>]+encoding="([^"]+)"', $data, $match)) {
     $encoding = $match[1];
   }
 
@@ -139,11 +145,11 @@ function drupal_xml_parser_create(&$data) {
     $out = drupal_convert_to_utf8($data, $encoding);
     if ($out !== FALSE) {
       $encoding = 'utf-8';
-      $data = preg_replace('/^(<\?xml[^>]+encoding)="(.+?)"/', '\\1="utf-8"', $out);
+      $data = ereg_replace('^(<\?xml[^>]+encoding)="([^"]+)"', '\\1="utf-8"', $out);
     }
     else {
       watchdog('php', 'Could not convert XML encoding %s to UTF-8.', array('%s' => $encoding), WATCHDOG_WARNING);
-      return FALSE;
+      return 0;
     }
   }
 
@@ -168,11 +174,11 @@ function drupal_convert_to_utf8($data, $encoding) {
   if (function_exists('iconv')) {
     $out = @iconv($encoding, 'utf-8', $data);
   }
-  elseif (function_exists('mb_convert_encoding')) {
+  else if (function_exists('mb_convert_encoding')) {
     $out = @mb_convert_encoding($data, 'utf-8', $encoding);
   }
-  elseif (function_exists('recode_string')) {
-    $out = @recode_string($encoding . '..utf-8', $data);
+  else if (function_exists('recode_string')) {
+    $out = @recode_string($encoding .'..utf-8', $data);
   }
   else {
     watchdog('php', 'Unsupported encoding %s. Please install iconv, GNU recode or mbstring for PHP.', array('%s' => $encoding), WATCHDOG_ERROR);
@@ -207,9 +213,7 @@ function drupal_truncate_bytes($string, $len) {
   if ((ord($string[$len]) < 0x80) || (ord($string[$len]) >= 0xC0)) {
     return substr($string, 0, $len);
   }
-  // Scan backwards to beginning of the byte sequence. 
-  while (--$len >= 0 && ord($string[$len]) >= 0x80 && ord($string[$len]) < 0xC0);
-
+  while (--$len >= 0 && ord($string[$len]) >= 0x80 && ord($string[$len]) < 0xC0) {};
   return substr($string, 0, $len);
 }
 
@@ -279,7 +283,7 @@ function mime_header_encode($string) {
     $output = '';
     while ($len > 0) {
       $chunk = drupal_truncate_bytes($string, $chunk_size);
-      $output .= ' =?UTF-8?B?' . base64_encode($chunk) . "?=\n";
+      $output .= ' =?UTF-8?B?'. base64_encode($chunk) ."?=\n";
       $c = strlen($chunk);
       $string = substr($string, $c);
       $len -= $c;
@@ -325,30 +329,30 @@ function _mime_header_decode($matches) {
  *   array('<', '&', '"'). This affects both named and numerical entities.
  */
 function decode_entities($text, $exclude = array()) {
-  static $html_entities;
-  if (!isset($html_entities)) {
-    include DRUPAL_ROOT . '/includes/unicode.entities.inc';
+  static $table;
+  // We store named entities in a table for quick processing.
+  if (!isset($table)) {
+    // Get all named HTML entities.
+    $table = array_flip(get_html_translation_table(HTML_ENTITIES));
+    // PHP gives us ISO-8859-1 data, we need UTF-8.
+    $table = array_map('utf8_encode', $table);
+    // Add apostrophe (XML)
+    $table['&apos;'] = "'";
   }
+  $newtable = array_diff($table, $exclude);
 
-  // Flip the exclude list so that we can do quick lookups later.
-  $exclude = array_flip($exclude);
-
-  // Use a regexp to select all entities in one pass, to avoid decoding
-  // double-escaped entities twice. The PREG_REPLACE_EVAL modifier 'e' is
-  // being used to allow for a callback (see
-  // http://php.net/manual/en/reference.pcre.pattern.modifiers).
-  return preg_replace('/&(#x?)?([A-Za-z0-9]+);/e', '_decode_entities("$1", "$2", "$0", $html_entities, $exclude)', $text);
+  // Use a regexp to select all entities in one pass, to avoid decoding double-escaped entities twice.
+  return preg_replace('/&(#x?)?([A-Za-z0-9]+);/e', '_decode_entities("$1", "$2", "$0", $newtable, $exclude)', $text);
 }
 
 /**
  * Helper function for decode_entities
  */
-function _decode_entities($prefix, $codepoint, $original, &$html_entities, &$exclude) {
+function _decode_entities($prefix, $codepoint, $original, &$table, &$exclude) {
   // Named entity
   if (!$prefix) {
-    // A named entity not in the exclude list.
-    if (isset($html_entities[$original]) && !isset($exclude[$html_entities[$original]])) {
-      return $html_entities[$original];
+    if (isset($table[$original])) {
+      return $table[$original];
     }
     else {
       return $original;
@@ -366,23 +370,23 @@ function _decode_entities($prefix, $codepoint, $original, &$html_entities, &$exc
   if ($codepoint < 0x80) {
     $str = chr($codepoint);
   }
-  elseif ($codepoint < 0x800) {
+  else if ($codepoint < 0x800) {
     $str = chr(0xC0 | ($codepoint >> 6))
          . chr(0x80 | ($codepoint & 0x3F));
   }
-  elseif ($codepoint < 0x10000) {
+  else if ($codepoint < 0x10000) {
     $str = chr(0xE0 | ( $codepoint >> 12))
          . chr(0x80 | (($codepoint >> 6) & 0x3F))
          . chr(0x80 | ( $codepoint       & 0x3F));
   }
-  elseif ($codepoint < 0x200000) {
+  else if ($codepoint < 0x200000) {
     $str = chr(0xF0 | ( $codepoint >> 18))
          . chr(0x80 | (($codepoint >> 12) & 0x3F))
          . chr(0x80 | (($codepoint >> 6)  & 0x3F))
          . chr(0x80 | ( $codepoint        & 0x3F));
   }
   // Check for excluded characters
-  if (isset($exclude[$str])) {
+  if (in_array($str, $exclude)) {
     return $original;
   }
   else {
@@ -470,13 +474,13 @@ function drupal_substr($text, $start, $length = NULL) {
   }
   else {
     $strlen = strlen($text);
-    // Find the starting byte offset.
+    // Find the starting byte offset
     $bytes = 0;
     if ($start > 0) {
       // Count all the continuation bytes from the start until we have found
-      // $start characters or the end of the string.
+      // $start characters
       $bytes = -1; $chars = -1;
-      while ($bytes < $strlen - 1 && $chars < $start) {
+      while ($bytes < $strlen && $chars < $start) {
         $bytes++;
         $c = ord($text[$bytes]);
         if ($c < 0x80 || $c >= 0xC0) {
@@ -484,9 +488,9 @@ function drupal_substr($text, $start, $length = NULL) {
         }
       }
     }
-    elseif ($start < 0) {
+    else if ($start < 0) {
       // Count all the continuation bytes from the end until we have found
-      // abs($start) characters.
+      // abs($start) characters
       $start = abs($start);
       $bytes = $strlen; $chars = 0;
       while ($bytes > 0 && $chars < $start) {
@@ -499,48 +503,37 @@ function drupal_substr($text, $start, $length = NULL) {
     }
     $istart = $bytes;
 
-    // Find the ending byte offset.
+    // Find the ending byte offset
     if ($length === NULL) {
-      $iend = $strlen;
+      $bytes = $strlen - 1;
     }
-    elseif ($length > 0) {
+    else if ($length > 0) {
       // Count all the continuation bytes from the starting index until we have
-      // found $length characters or reached the end of the string, then
-      // backtrace one byte.
-      $iend = $istart - 1; $chars = -1;
-      while ($iend < $strlen - 1 && $chars < $length) {
-        $iend++;
-        $c = ord($text[$iend]);
+      // found $length + 1 characters. Then backtrack one byte.
+      $bytes = $istart; $chars = 0;
+      while ($bytes < $strlen && $chars < $length) {
+        $bytes++;
+        $c = ord($text[$bytes]);
         if ($c < 0x80 || $c >= 0xC0) {
           $chars++;
         }
       }
-      // Backtrace one byte if the end of the string was not reached.
-      if ($iend < $strlen - 1) {
-        $iend--;
-      }
+      $bytes--;
     }
-    elseif ($length < 0) {
+    else if ($length < 0) {
       // Count all the continuation bytes from the end until we have found
-      // abs($start) characters, then backtrace one byte.
+      // abs($length) characters
       $length = abs($length);
-      $iend = $strlen; $chars = 0;
-      while ($iend > 0 && $chars < $length) {
-        $iend--;
-        $c = ord($text[$iend]);
+      $bytes = $strlen - 1; $chars = 0;
+      while ($bytes >= 0 && $chars < $length) {
+        $c = ord($text[$bytes]);
         if ($c < 0x80 || $c >= 0xC0) {
           $chars++;
         }
-      }
-      // Backtrace one byte if we are not at the begining of the string.
-      if ($iend > 0) {
-        $iend--;
+        $bytes--;
       }
     }
-    else {
-      // $length == 0, return an empty string.
-      $iend = $istart - 1;
-    }
+    $iend = $bytes;
 
     return substr($text, $istart, max(0, $iend - $istart + 1));
   }

@@ -1,13 +1,8 @@
 <?php
-// $Id: dblog.install,v 1.16 2009/05/27 18:33:56 dries Exp $
+// $Id: dblog.install,v 1.6.2.1 2009/01/06 15:46:36 goba Exp $
 
 /**
- * @file
- * Install, update and uninstall functions for the dblog module.
- */
-
-/**
- * Implement hook_install().
+ * Implementation of hook_install().
  */
 function dblog_install() {
   // Create tables.
@@ -15,7 +10,7 @@ function dblog_install() {
 }
 
 /**
- * Implement hook_uninstall().
+ * Implementation of hook_uninstall().
  */
 function dblog_uninstall() {
   // Remove tables.
@@ -23,7 +18,7 @@ function dblog_uninstall() {
 }
 
 /**
- * Implement hook_schema().
+ * Implementation of hook_schema().
  */
 function dblog_schema() {
   $schema['watchdog'] = array(
@@ -42,7 +37,7 @@ function dblog_schema() {
       ),
       'type' => array(
         'type' => 'varchar',
-        'length' => 64,
+        'length' => 16,
         'not null' => TRUE,
         'default' => '',
         'description' => 'Type of log message, for example "user" or "page not found."',
@@ -70,7 +65,7 @@ function dblog_schema() {
       'link' => array(
         'type' => 'varchar',
         'length' => 255,
-        'not null' => FALSE,
+        'not null' => TRUE,
         'default' => '',
         'description' => 'Link to view the result of the event.',
       ),
@@ -80,8 +75,10 @@ function dblog_schema() {
         'description' => 'URL of the origin of the event.',
       ),
       'referer' => array(
-        'type' => 'text',
-        'not null' => FALSE,
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
         'description' => 'URL of referring page.',
       ),
       'hostname' => array(
@@ -99,39 +96,9 @@ function dblog_schema() {
       ),
     ),
     'primary key' => array('wid'),
-    'indexes' => array(
-      'type' => array('type'),
-      'uid' => array('uid'),
-    ),
+    'indexes' => array('type' => array('type')),
   );
 
   return $schema;
 }
 
-/**
- * Allow NULL values for links and longer referers.
- */
-function dblog_update_7001() {
-  $ret = array();
-  db_change_field($ret, 'watchdog', 'link', 'link', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'default' => ''));
-  db_change_field($ret, 'watchdog', 'referer', 'referer', array('type' => 'text', 'not null' => FALSE));
-  return $ret;
-}
-
-/**
- * Add index on uid.
- */
-function dblog_update_7002() {
-  $ret = array();
-  db_add_index($ret, 'watchdog', 'uid', array('uid'));
-  return $ret;
-}
-
-/**
- * Allow longer type values.
- */
-function dblog_update_7003() {
-  $ret = array();
-  db_change_field($ret, 'watchdog', 'type', 'type', array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''));
-  return $ret;
-}

@@ -1,8 +1,10 @@
-/* $Id: fix-ie-rtl.css,v 1.4 2008/03/13 20:02:18 dries Exp $ */
+/* $Id: fix-ie-rtl.css,v 1.2 2007/11/09 22:14:41 goba Exp $ */
 
 body {
   /* Center layout */
   text-align: center;
+  /* Allow text resizing */
+  font-size: 80%;
 }
 
 #squeeze {

@@ -1,13 +1,8 @@
 <?php
-// $Id: contact.install,v 1.13 2009/05/27 18:33:56 dries Exp $
+// $Id: contact.install,v 1.10.2.1 2009/01/06 15:46:36 goba Exp $
 
 /**
- * @file
- * Install, update and uninstall functions for the contact module.
- */
-
-/**
- * Implement hook_install().
+ * Implementation of hook_install().
  */
 function contact_install() {
   // Create tables.
@@ -15,7 +10,7 @@ function contact_install() {
 }
 
 /**
- * Implement hook_uninstall().
+ * Implementation of hook_uninstall().
  */
 function contact_uninstall() {
   // Remove tables.
@@ -27,7 +22,7 @@ function contact_uninstall() {
 }
 
 /**
- * Implement hook_schema().
+ * Implementation of hook_schema().
  */
 function contact_schema() {
   $schema['contact'] = array(

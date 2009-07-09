@@ -1,13 +1,8 @@
 <?php
-// $Id: search.install,v 1.22 2009/06/01 22:07:09 dries Exp $
+// $Id: search.install,v 1.14.2.1 2009/01/06 15:46:37 goba Exp $
 
 /**
- * @file
- * Install, update and uninstall functions for the search module.
- */
-
-/**
- * Implement hook_install().
+ * Implementation of hook_install().
  */
 function search_install() {
   // Create tables.
@@ -15,7 +10,7 @@ function search_install() {
 }
 
 /**
- * Implement hook_uninstall().
+ * Implementation of hook_uninstall().
  */
 function search_uninstall() {
   // Remove tables.
@@ -27,7 +22,7 @@ function search_uninstall() {
 }
 
 /**
- * Implement hook_schema().
+ * Implementation of hook_schema().
  */
 function search_schema() {
   $schema['search_dataset'] = array(
@@ -60,7 +55,7 @@ function search_schema() {
         'description' => 'Set to force node reindexing.',
       ),
     ),
-    'primary key' => array('sid', 'type'),
+    'unique keys' => array('sid_type' => array('sid', 'type')),
   );
 
   $schema['search_index'] = array(
@@ -94,12 +89,9 @@ function search_schema() {
     ),
     'indexes' => array(
       'sid_type' => array('sid', 'type'),
+      'word' => array('word')
     ),
-    'foreign keys' => array(
-      'sid' => array('search_dataset' => 'sid'),
-      'type' => array('search_dataset' => 'type'),
-    ),
-    'primary key' => array('word', 'sid', 'type'),
+    'unique keys' => array('word_sid_type' => array('word', 'sid', 'type')),
   );
 
   $schema['search_total'] = array(
@@ -153,25 +145,9 @@ function search_schema() {
       ),
     ),
     'primary key' => array('sid', 'type', 'nid'),
-    'indexes' => array(
-      'nid' => array('nid'),
-    ),
+    'indexes' => array('nid' => array('nid')),
   );
 
   return $schema;
 }
 
-/**
- * Replace unique keys in 'search_dataset' and 'search_index' by primary keys.
- */
-function search_update_7000() {
-  $ret = array();
-  db_drop_unique_key($ret, 'search_dataset', 'sid_type');
-  db_add_primary_key($ret, 'search_dataset', array('sid', 'type'));
-
-  db_drop_index($ret, 'search_index', 'word');
-  db_drop_unique_key($ret, 'search_index', 'word_sid_type');
-  db_add_primary_key($ret, 'search_index', array('word', 'sid', 'type'));
-
-  return $ret;
-}

@@ -1,5 +1,5 @@
 <?php
-// $Id: syslog.module,v 1.24 2009/06/07 02:44:11 dries Exp $
+// $Id: syslog.module,v 1.14.2.2 2008/07/24 06:52:43 dries Exp $
 
 /**
  * @file
@@ -14,22 +14,30 @@ else {
 }
 
 /**
- * Implement hook_help().
+ * Implementation of hook_help().
  */
 function syslog_help($path, $arg) {
   switch ($path) {
     case 'admin/help#syslog':
-      $output = '<p>' . t("The syslog module enables Drupal to send messages to the operating system's logging facility.") . '</p>';
-      $output .= '<p>' . t('Syslog is an operating system administrative logging tool, and provides valuable information for use in system management and security auditing. Most suited to medium and large sites, syslog provides filtering tools that allow messages to be routed by type and severity. On UNIX/Linux systems, the file /etc/syslog.conf defines this routing configuration; on Microsoft Windows, all messages are sent to the Event Log. For more information on syslog facilities, severity levels, and how to set up a syslog.conf file, see <a href="@syslog_conf">UNIX/Linux syslog.conf</a> and PHP\'s <a href="@php_openlog">openlog</a> and <a href="@php_syslog">syslog</a> functions.', array('@syslog_conf' => url('http://www.rt.com/man/syslog.5.html'), '@php_openlog' => url('http://www.php.net/manual/function.openlog.php'), '@php_syslog' => url('http://www.php.net/manual/function.syslog.php'))) . '</p>';
-      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@syslog">Syslog module</a>.', array('@syslog' => 'http://drupal.org/handbook/modules/syslog')) . '</p>';
+      $output = '<p>'. t("The syslog module enables Drupal to send messages to the operating system's logging facility.") .'</p>';
+      $output .= '<p>'. t('Syslog is an operating system administrative logging tool, and provides valuable information for use in system management and security auditing. Most suited to medium and large sites, syslog provides filtering tools that allow messages to be routed by type and severity. On UNIX/Linux systems, the file /etc/syslog.conf defines this routing configuration; on Microsoft Windows, all messages are sent to the Event Log. For more information on syslog facilities, severity levels, and how to set up a syslog.conf file, see <a href="@syslog_conf">UNIX/Linux syslog.conf</a> and PHP\'s <a href="@php_openlog">openlog</a> and <a href="@php_syslog">syslog</a> functions.', array('@syslog_conf' => url('http://www.rt.com/man/syslog.5.html'), '@php_openlog' => url('http://www.php.net/manual/en/function.openlog.php'), '@php_syslog' => url('http://www.php.net/manual/en/function.syslog.php'))) .'</p>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@syslog">Syslog module</a>.', array('@syslog' => 'http://drupal.org/handbook/modules/syslog')) .'</p>';
       return $output;
   }
 }
 
-/**
- * Implement hook_form_FORM_ID_alter().
- */
-function syslog_form_system_logging_settings_alter(&$form, &$form_state) {
+function syslog_menu() {
+  $items['admin/settings/logging/syslog'] = array(
+    'title'          => 'Syslog',
+    'description'    => 'Settings for syslog logging. Syslog is an operating system administrative logging tool used in systems management and security auditing. Most suited to medium and large sites, syslog provides filtering tools that allow messages to be routed by type and severity.',
+    'page callback'  => 'drupal_get_form',
+    'page arguments' => array('syslog_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+  );
+  return $items;
+}
+
+function syslog_admin_settings() {
   $form['syslog_facility'] = array(
     '#type'          => 'select',
     '#title'         => t('Send events to this syslog facility'),
@@ -38,7 +46,7 @@ function syslog_form_system_logging_settings_alter(&$form, &$form_state) {
     '#description'   => t('Select the syslog facility code under which Drupal\'s messages should be sent. On UNIX/Linux systems, Drupal can flag its messages with the code LOG_LOCAL0 through LOG_LOCAL7; for Microsoft Windows, all messages are flagged with the code LOG_USER. Depending on the system configuration, syslog and other logging tools use this code to identify or filter Drupal messages from within the entire system log. For more information on syslog, see <a href="@syslog_help">Syslog help</a>.', array(
       '@syslog_help' => url('admin/help/syslog'))),
   );
-  $form['buttons']['#weight'] = 1;
+  return system_settings_form($form);
 }
 
 function syslog_facility_list() {
@@ -60,18 +68,15 @@ function syslog_facility_list() {
   return $facility_list;
 }
 
-/**
- * Implement hook_watchdog().
- */
-function syslog_watchdog(array $log_entry) {
-  $log_init = &drupal_static(__FUNCTION__, FALSE);
+function syslog_watchdog($entry) {
+  static $log_init = FALSE;
 
   if (!$log_init) {
     $log_init = TRUE;
     openlog('drupal', LOG_NDELAY, variable_get('syslog_facility', DEFAULT_SYSLOG_FACILITY));
   }
 
-  syslog($log_entry['severity'], theme('syslog_format', $log_entry));
+  syslog($entry['severity'], theme('syslog_format', $entry));
 }
 
 function syslog_theme() {
@@ -91,14 +96,14 @@ function theme_syslog_format($entry) {
   global $base_url;
 
   $message  = $base_url;
-  $message .= '|' . $entry['timestamp'];
-  $message .= '|' . $entry['type'];
-  $message .= '|' . $entry['ip'];
-  $message .= '|' . $entry['request_uri'];
-  $message .= '|' . $entry['referer'];
-  $message .= '|' . $entry['user']->uid;
-  $message .= '|' . strip_tags($entry['link']);
-  $message .= '|' . strip_tags(is_null($entry['variables']) ? $entry['message'] : strtr($entry['message'], $entry['variables']));
+  $message .= '|'. $entry['timestamp'];
+  $message .= '|'. $entry['type'];
+  $message .= '|'. $entry['ip'];
+  $message .= '|'. $entry['request_uri'];
+  $message .= '|'. $entry['referer'];
+  $message .= '|'. $entry['user']->uid;
+  $message .= '|'. strip_tags($entry['link']);
+  $message .= '|'. strip_tags(is_null($entry['variables']) ? $entry['message'] : strtr($entry['message'], $entry['variables']));
 
   return $message;
 }

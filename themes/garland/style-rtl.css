@@ -1,4 +1,4 @@
-/* $Id: style-rtl.css,v 1.13 2009/06/03 06:58:57 dries Exp $ */
+/* $Id: style-rtl.css,v 1.6 2007/12/17 15:05:10 goba Exp $ */
 
 html {
   direction: rtl;
@@ -11,20 +11,39 @@ body {
   direction: rtl;
 }
 
-ul, .block ul, ol {
-  padding: 0 1.5em 0 0;
+ol li, ul li {
+  margin: 0.4em .5em 0.4em 0;
 }
 
 ul.menu, .item-list ul {
   margin: 0.35em -0.5em 0 0;
 }
 
+ul.menu ul, .item-list ul ul {
+  margin-left: 0;
+  margin-right: 0em;
+}
+
 ol li, ul li, ul.menu li, .item-list ul li, li.leaf {
   margin: 0.15em .5em 0.15em 0;
 }
 
+ul li, ul.menu li, .item-list ul li, li.leaf {
+  padding: 0 1.5em .2em 0;
+  background: transparent url("images/menu-leaf.gif") no-repeat 100% .35em;
+}
+
+ol li {
+  margin-left: 0;
+  margin-right: 2em;
+}
+
+ul li.expanded {
+  background: transparent url("images/menu-expanded.gif") no-repeat 100% .35em;
+}
+
 ul li.collapsed {
-  list-style-image: url(images/menu-collapsed-rtl.gif);
+  background: transparent url("images/menu-collapsed-rtl.gif") no-repeat 100% .35em;
 }
 
 ul.inline li {
@@ -62,10 +81,6 @@ dl dt {
 
 dl dd {
   margin: 0 1.5em .5em 0;
-}
-
-.messages li {
-  padding: 0 1.3 0 0;
 }
 
 .form-button, .form-submit {
@@ -110,25 +125,24 @@ dl dd {
 /**
  * Primary navigation
  */
-ul.main-menu {
+ul.primary-links {
   float: left;
 width:70%;
 }
 
-ul.main-menu li {
+ul.primary-links li {
   float: right;
 }
 
 /**
  * Secondary navigation
  */
-ul.secondary-menu {
+ul.secondary-links {
   float: left;
   clear: left;
-  margin-left: 16em;
 }
 
-ul.secondary-menu li {
+ul.secondary-links li {
   float: right;
 }
 
@@ -200,27 +214,19 @@ html.js fieldset.collapsed legend a {
 }
 
 /**
- * Vertical tabs.
- */
-div.vertical-tabs {
-  margin-left: 5%;
-  margin-right: 15em;
-}
-
-/**
  * Syndication Block
  */
-#block-node-syndicate h2 {
+#block-node-0 h2 {
   float: right;
   padding-right: 0;
   padding-left: 20px;
 }
 
-#block-node-syndicate img {
+#block-node-0 img {
   float: left;
 }
 
-#block-node-syndicate .content {
+#block-node-0 .content {
   clear: left;
 }
 

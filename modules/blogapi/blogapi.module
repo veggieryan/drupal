@@ -1,5 +1,5 @@
 <?php
-// $Id: blogapi.module,v 1.158 2009/07/05 18:00:07 dries Exp $
+// $Id: blogapi.module,v 1.115.2.5 2008/10/08 20:12:17 goba Exp $
 
 /**
  * @file
@@ -7,33 +7,28 @@
  */
 
 /**
- * Implement hook_help().
+ * Implementation of hook_help().
  */
 function blogapi_help($path, $arg) {
   switch ($path) {
     case 'admin/help#blogapi':
-      $output = '<p>' . t("The Blog API module allows your site's users to access and post to their blogs from external blogging clients. External blogging clients are available for a wide range of desktop operating systems, and generally provide a feature-rich graphical environment for creating and editing posts.") . '</p>';
-      $output .= '<p>' . t('<a href="@ecto-link">Ecto</a>, a blogging client available for both Mac OS X and Microsoft Windows, can be used with Blog API. Blog API also supports <a href="@blogger-api">Blogger API</a>, <a href="@metaweblog-api">MetaWeblog API</a>, and most of the <a href="@movabletype-api">Movable Type API</a>. Blogging clients and other services (e.g. <a href="@flickr">Flickr\'s</a> "post to blog") that support these APIs may also be compatible.', array('@ecto-link' => url('http://infinite-sushi.com/software/ecto/'), '@blogger-api' => url('http://www.blogger.com/developers/api/1_docs/'), '@metaweblog-api' => url('http://www.xmlrpc.com/metaWeblogApi'), '@movabletype-api' => url('http://www.movabletype.org/docs/mtmanual_programmatic.html'), '@flickr' => url('http://www.flickr.com'))) . '</p>';
-      $output .= '<p>' . t('Select the content types available to external clients on the <a href="@blogapi-settings">Blog API settings page</a>. If supported and available, each content type will be displayed as a separate "blog" by the external client.', array('@blogapi-settings' => url('admin/settings/blogapi'))) . '</p>';
-      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@blogapi">Blog API module</a>.', array('@blogapi' => url('http://drupal.org/handbook/modules/blogapi/'))) . '</p>';
+      $output = '<p>'. t("The Blog API module allows your site's users to access and post to their blogs from external blogging clients. External blogging clients are available for a wide range of desktop operating systems, and generally provide a feature-rich graphical environment for creating and editing posts.") .'</p>';
+      $output .= '<p>'. t('<a href="@ecto-link">Ecto</a>, a blogging client available for both Mac OS X and Microsoft Windows, can be used with Blog API. Blog API also supports <a href="@blogger-api">Blogger API</a>, <a href="@metaweblog-api">MetaWeblog API</a>, and most of the <a href="@movabletype-api">Movable Type API</a>. Blogging clients and other services (e.g. <a href="@flickr">Flickr\'s</a> "post to blog") that support these APIs may also be compatible.', array('@ecto-link' => url('http://infinite-sushi.com/software/ecto/'), '@blogger-api' => url('http://www.blogger.com/developers/api/1_docs/'), '@metaweblog-api' => url('http://www.xmlrpc.com/metaWeblogApi'), '@movabletype-api' => url('http://www.movabletype.org/docs/mtmanual_programmatic.html'), '@flickr' => url('http://www.flickr.com'))) .'</p>';
+      $output .= '<p>'. t('Select the content types available to external clients on the <a href="@blogapi-settings">Blog API settings page</a>. If supported and available, each content type will be displayed as a separate "blog" by the external client.', array('@blogapi-settings' => url('admin/settings/blogapi'))) .'</p>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@blogapi">Blog API module</a>.', array('@blogapi' => url('http://drupal.org/handbook/modules/blogapi/'))) .'</p>';
       return $output;
   }
 }
 
 /**
- * Implement hook_permission().
+ * Implementation of hook_perm().
  */
-function blogapi_permission() {
-  return array(
-    'administer content with blog api' => array(
-      'title' => t('Administer content with blog API'),
-      'description' => t('Manage website content from external tools.'),
-    ),
-  );
+function blogapi_perm() {
+  return array('administer content with blog api');
 }
 
 /**
- * Implement hook_xmlrpc().
+ * Implementation of hook_xmlrpc().
  */
 function blogapi_xmlrpc() {
   return array(
@@ -142,15 +137,16 @@ function blogapi_xmlrpc() {
 /**
  * Blogging API callback. Finds the URL of a user's blog.
  */
+
 function blogapi_blogger_get_users_blogs($appid, $username, $password) {
+
   $user = blogapi_validate_user($username, $password);
   if ($user->uid) {
     $types = _blogapi_get_node_types();
     $structs = array();
     foreach ($types as $type) {
-      $structs[] = array('url' => url('user/' . $user->uid, array('absolute' => TRUE)), 'blogid' => $type, 'blogName' => $user->name . ": " . $type);
+      $structs[] = array('url' => url('blog/'. $user->uid, array('absolute' => TRUE)), 'blogid' => $type, 'blogName' => $user->name .": ". $type);
     }
-
     return $structs;
   }
   else {
@@ -172,7 +168,7 @@ function blogapi_blogger_get_user_info($appkey, $username, $password) {
       'firstname' => $name[0],
       'nickname' => $user->name,
       'email' => $user->mail,
-      'url' => url('user/' . $user->uid, array('absolute' => TRUE)));
+      'url' => url('blog/'. $user->uid, array('absolute' => TRUE)));
   }
   else {
     return blogapi_error($user);
@@ -195,17 +191,17 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
 
   $edit = array();
   $edit['type'] = $blogid;
-  // Get the node type defaults.
-  $node_type_default = variable_get('node_options_' . $edit['type'], array('status', 'promote'));
+  // get the node type defaults
+  $node_type_default = variable_get('node_options_'. $edit['type'], array('status', 'promote'));
   $edit['uid'] = $user->uid;
   $edit['name'] = $user->name;
   $edit['promote'] = in_array('promote', $node_type_default);
-  $edit['comment'] = variable_get('comment_' . $edit['type'], 2);
+  $edit['comment'] = variable_get('comment_'. $edit['type'], 2);
   $edit['revision'] = in_array('revision', $node_type_default);
   $edit['format'] = FILTER_FORMAT_DEFAULT;
   $edit['status'] = $publish;
 
-  // Check for bloggerAPI vs. metaWeblogAPI.
+  // check for bloggerAPI vs. metaWeblogAPI
   if (is_array($content)) {
     $edit['title'] = $content['title'];
     $edit['body'] = $content['description'];
@@ -213,7 +209,7 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
   }
   else {
     $edit['title'] = blogapi_blogger_title($content);
-    $edit['body'][0]['value'] = $content;
+    $edit['body'] = $content;
   }
 
   if (!node_access('create', $edit['type'])) {
@@ -221,10 +217,10 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
   }
 
   if (user_access('administer nodes') && !isset($edit['date'])) {
-    $edit['date'] = format_date(REQUEST_TIME, 'custom', 'Y-m-d H:i:s O');
+    $edit['date'] = format_date(time(), 'custom', 'Y-m-d H:i:s O');
   }
 
-  module_invoke_all('node_blogapi_new', $edit);
+  node_invoke_nodeapi($edit, 'blogapi new');
 
   $valid = blogapi_status_error_check($edit, $publish);
   if ($valid !== TRUE) {
@@ -240,7 +236,7 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
   node_save($node);
   if ($node->nid) {
     watchdog('content', '@type: added %title using blog API.', array('@type' => $node->type, '%title' => $node->title), WATCHDOG_NOTICE, l(t('view'), "node/$node->nid"));
-    // blogger.newPost returns a string so we cast the nid to a string by putting it in double quotes.
+    // blogger.newPost returns a string so we cast the nid to a string by putting it in double quotes:
     return "$node->nid";
   }
 
@@ -251,6 +247,7 @@ function blogapi_blogger_new_post($appkey, $blogid, $username, $password, $conte
  * Blogging API callback. Modifies the specified blog node.
  */
 function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $content, $publish) {
+
   $user = blogapi_validate_user($username, $password);
 
   if (!$user->uid) {
@@ -271,18 +268,18 @@ function blogapi_blogger_edit_post($appkey, $postid, $username, $password, $cont
   $original_status = $node->status;
   $node->status = $publish;
 
-  // Check for bloggerAPI vs. metaWeblogAPI.
+  // check for bloggerAPI vs. metaWeblogAPI
   if (is_array($content)) {
     $node->title = $content['title'];
-    $node->body[0]['value'] = $content['description'];
+    $node->body = $content['description'];
     _blogapi_mt_extra($node, $content);
   }
   else {
     $node->title = blogapi_blogger_title($content);
-    $node->body[0]['value'] = $content;
+    $node->body = $content;
   }
 
-  module_invoke_all('node_blogapi_edit', $node);
+  node_invoke_nodeapi($node, 'blogapi edit');
 
   $valid = blogapi_status_error_check($node, $original_status);
   if ($valid !== TRUE) {
@@ -328,10 +325,10 @@ function blogapi_blogger_get_post($appkey, $postid, $username, $password) {
  *   TRUE if no error, or the blogapi_error().
  */
 function blogapi_status_error_check($node, $original_status) {
-
+  
   $node = (object) $node;
 
-  $node_type_default = variable_get('node_options_' . $node->type, array('status', 'promote'));
+  $node_type_default = variable_get('node_options_'. $node->type, array('status', 'promote'));
 
   // If we don't have the 'administer nodes' permission and the status is
   // changing or for a new node the status is not the content type's default,
@@ -379,22 +376,15 @@ function blogapi_blogger_get_recent_posts($appkey, $blogid, $username, $password
   }
 
   if ($bodies) {
-    $result = db_query_range("SELECT n.nid, n.title, n.comment, n.created, u.name FROM {node} n, {node_revision} r, {users} u WHERE n.uid = u.uid AND n.vid = r.vid AND n.type = :type AND n.uid = :uid ORDER BY n.created DESC",  array(
-      ':type' => $blogid,
-      ':uid' => $user->uid
-    ), 0, $number_of_posts);
+    $result = db_query_range("SELECT n.nid, n.title, r.body, r.format, n.comment, n.created, u.name FROM {node} n, {node_revisions} r, {users} u WHERE n.uid = u.uid AND n.vid = r.vid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC",  $blogid, $user->uid, 0, $number_of_posts);
   }
   else {
-    $result = db_query_range("SELECT n.nid, n.title, n.created, u.name FROM {node} n, {users} u WHERE n.uid = u.uid AND n.type = :type AND n.uid = :uid ORDER BY n.created DESC", array(
-      ':type' => $blogid,
-      ':uid' => $user->uid
-    ), 0, $number_of_posts);
+    $result = db_query_range("SELECT n.nid, n.title, n.created, u.name FROM {node} n, {users} u WHERE n.uid = u.uid AND n.type = '%s' AND n.uid = %d ORDER BY n.created DESC", $blogid, $user->uid, 0, $number_of_posts);
   }
   $blogs = array();
-  foreach ($result as $blog) {
+  while ($blog = db_fetch_object($result)) {
     $blogs[] = _blogapi_get_post($blog, $bodies);
   }
-
   return $blogs;
 }
 
@@ -425,8 +415,8 @@ function blogapi_metaweblog_new_media_object($blogid, $username, $password, $fil
   $roles = array_intersect(user_roles(FALSE, 'administer content with blog api'), $user->roles);
 
   foreach ($roles as $rid => $name) {
-    $extensions .= ' ' . strtolower(variable_get("blogapi_extensions_$rid", variable_get('blogapi_extensions_default', 'jpg jpeg gif png txt doc xls pdf ppt pps odt ods odp')));
-    $usersize = max($usersize, variable_get("blogapi_usersize_$rid", variable_get('blogapi_usersize_default', 1)) * 1024 * 1024);
+    $extensions .= ' '. strtolower(variable_get("blogapi_extensions_$rid", variable_get('blogapi_extensions_default', 'jpg jpeg gif png txt doc xls pdf ppt pps odt ods odp')));
+    $usersize= max($usersize, variable_get("blogapi_usersize_$rid", variable_get('blogapi_usersize_default', 1)) * 1024 * 1024);
     $uploadsize = max($uploadsize, variable_get("blogapi_uploadsize_$rid", variable_get('blogapi_uploadsize_default', 1)) * 1024 * 1024);
   }
 
@@ -457,7 +447,7 @@ function blogapi_metaweblog_new_media_object($blogid, $username, $password, $fil
     }
 
     $filename = str_replace('.', '_', $filename);
-    $filename .= '.' . $final_extension;
+    $filename .= '.'. $final_extension;
   }
 
   $data = $file['bits'];
@@ -466,7 +456,7 @@ function blogapi_metaweblog_new_media_object($blogid, $username, $password, $fil
     return blogapi_error(t('No file sent.'));
   }
 
-  if (!$file = file_unmanaged_save_data($data, $filename)) {
+  if (!$file = file_save_data($data, $filename)) {
     return blogapi_error(t('Error storing file.'));
   }
 
@@ -499,17 +489,16 @@ function blogapi_metaweblog_get_category_list($blogid, $username, $password) {
   $categories = array();
   if ($vocabularies) {
     foreach ($vocabularies as $vocabulary) {
-      $terms = module_invoke('taxonomy', 'get_tree', $vocabulary->vid);
+      $terms = module_invoke('taxonomy', 'get_tree', $vocabulary->vid, 0, -1);
       foreach ($terms as $term) {
         $term_name = $term->name;
         foreach (module_invoke('taxonomy', 'get_parents', $term->tid, 'tid') as $parent) {
-          $term_name = $parent->name . '/' . $term_name;
+          $term_name = $parent->name .'/'. $term_name;
         }
         $categories[] = array('categoryName' => $term_name, 'categoryId' => $term->tid);
       }
     }
   }
-
   return $categories;
 }
 
@@ -541,7 +530,7 @@ function blogapi_mt_get_post_categories($postid, $username, $password) {
   foreach ($terms as $term) {
     $term_name = $term->name;
     foreach (module_invoke('taxonomy', 'get_parents', $term->tid, 'tid') as $parent) {
-      $term_name = $parent->name . '/' . $term_name;
+      $term_name = $parent->name .'/'. $term_name;
     }
     $categories[] = array('categoryName' => $term_name, 'categoryId' => $term->tid, 'isPrimary' => TRUE);
   }
@@ -568,7 +557,6 @@ function blogapi_mt_set_post_categories($postid, $username, $password, $categori
     return $validated;
   }
   node_save($node);
-
   return TRUE;
 }
 
@@ -582,10 +570,12 @@ function blogapi_mt_validate_terms($node) {
     $found_terms = array();
     if (!empty($node->taxonomy)) {
       $term_list = array_unique($node->taxonomy);
-      $terms = taxonomy_term_load_multiple($term_list, array('type' => $node->type));
+      $params = $term_list;
+      $params[] = $node->type;
+      $result = db_query(db_rewrite_sql("SELECT t.tid, t.vid FROM {term_data} t INNER JOIN {vocabulary_node_types} n ON t.vid = n.vid WHERE t.tid IN (". db_placeholders($term_list) .") AND n.type = '%s'", 't', 'tid'), $params);
       $found_terms = array();
       $found_count = 0;
-      foreach ($terms as $term) {
+      while ($term = db_fetch_object($result)) {
         $found_terms[$term->vid][$term->tid] = $term->tid;
         $found_count++;
       }
@@ -595,9 +585,9 @@ function blogapi_mt_validate_terms($node) {
       }
     }
     // Look up all the vocabularies for this node type.
-    $vocabularies = taxonomy_vocabulary_load_multiple(array(), array('type' => $node->type));
+    $result2 = db_query(db_rewrite_sql("SELECT v.vid, v.name, v.required, v.multiple FROM {vocabulary} v INNER JOIN {vocabulary_node_types} n ON v.vid = n.vid WHERE n.type = '%s'", 'v', 'vid'), $node->type);
     // Check each vocabulary associated with this node type.
-    foreach ($vocabularies as $vocabulary) {
+    while ($vocabulary = db_fetch_object($result2)) {
       // Required vocabularies must have at least one term.
       if ($vocabulary->required && empty($found_terms[$vocabulary->vid])) {
         return blogapi_error(t('A category from the @vocabulary_name vocabulary is required.', array('@vocabulary_name' => $vocabulary->name)));
@@ -615,7 +605,7 @@ function blogapi_mt_validate_terms($node) {
 }
 
 /**
- * Blogging API callback. Sends a list of available text formats.
+ * Blogging API callback. Sends a list of available input formats.
  */
 function blogapi_mt_supported_text_filters() {
   // NOTE: we're only using anonymous' formats because the MT spec
@@ -633,16 +623,14 @@ function blogapi_mt_supported_text_filters() {
 }
 
 /**
- * Blogging API callback. Publishes the given node.
+ * Blogging API callback. Publishes the given node
  */
 function blogapi_mt_publish_post($postid, $username, $password) {
   $user = blogapi_validate_user($username, $password);
-
   if (!$user->uid) {
     return blogapi_error($user);
   }
   $node = node_load($postid);
-
   if (!$node) {
     return blogapi_error(t('Invalid post.'));
   }
@@ -667,7 +655,6 @@ function blogapi_mt_publish_post($postid, $username, $password) {
  */
 function blogapi_error($message) {
   static $xmlrpcusererr;
-
   if (!is_array($message)) {
     $message = array($message);
   }
@@ -681,14 +668,13 @@ function blogapi_error($message) {
  * Ensure that the given user has permission to edit a blog.
  */
 function blogapi_validate_user($username, $password) {
-  $form_state['values']['name'] = $username;
-  $form_state['values']['pass'] = $password;
-  $form_state['values']['op'] = t('Login');
-  drupal_form_submit('user_login', $form_state);
+  global $user;
 
-  if (!form_get_error()) {
+  $user = user_authenticate(array('name' => $username, 'pass' => $password));
+
+  if ($user->uid) {
     if (user_access('administer content with blog api', $user)) {
-      return $GLOBALS['user'];
+      return $user;
     }
     else {
       return t('You do not have permission to edit this blog.');
@@ -703,22 +689,18 @@ function blogapi_validate_user($username, $password) {
  * For the blogger API, extract the node title from the contents field.
  */
 function blogapi_blogger_title(&$contents) {
-  if (preg_match('/<title>(.*?)<\/title>/i', $contents, $title)) {
+  if (eregi('<title>([^<]*)</title>', $contents, $title)) {
     $title = strip_tags($title[0]);
-    $contents = preg_replace('/<title>.*?<\/title>/i', '', $contents);
+    $contents = ereg_replace('<title>[^<]*</title>', '', $contents);
   }
   else {
     list($title, $contents) = explode("\n", $contents, 2);
   }
-
   return $title;
 }
 
-/**
- * Add some settings to the admin_settings form.
- */
 function blogapi_admin_settings() {
-  $node_types = array_map('check_plain', node_type_get_names());
+  $node_types = array_map('check_plain', node_get_types('names'));
   $defaults = isset($node_types['blog']) ? array('blog' => 1) : array();
   $form['blogapi_node_types'] = array(
     '#type' => 'checkboxes',
@@ -767,49 +749,46 @@ function blogapi_admin_settings() {
     '#field_suffix' => t('MB')
   );
 
-  $form['settings_general']['upload_max_size'] = array('#value' => '<p>' . t('Your PHP settings limit the maximum file size per upload to %size.', array('%size' => format_size(file_upload_max_size()))) . '</p>');
+  $form['settings_general']['upload_max_size'] = array('#value' => '<p>'. t('Your PHP settings limit the maximum file size per upload to %size.', array('%size' => format_size(file_upload_max_size()))).'</p>');
 
-  $roles = user_roles(FALSE, 'administer content with blog api');
+  $roles = user_roles(0, 'administer content with blog api');
   $form['roles'] = array('#type' => 'value', '#value' => $roles);
 
   foreach ($roles as $rid => $role) {
-    $form['settings_role_' . $rid] = array(
+    $form['settings_role_'. $rid] = array(
       '#type' => 'fieldset',
       '#title' => t('Settings for @role', array('@role' => $role)),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
-    $form['settings_role_' . $rid]['blogapi_extensions_' . $rid] = array(
+    $form['settings_role_'. $rid]['blogapi_extensions_'. $rid] = array(
       '#type' => 'textfield',
       '#title' => t('Permitted file extensions'),
-      '#default_value' => variable_get('blogapi_extensions_' . $rid, $blogapi_extensions_default),
+      '#default_value' => variable_get('blogapi_extensions_'. $rid, $blogapi_extensions_default),
       '#maxlength' => 255,
       '#description' => t('Extensions that users in this role can upload. Separate extensions with a space and do not include the leading dot.'),
     );
-    $form['settings_role_' . $rid]['blogapi_uploadsize_' . $rid] = array(
+    $form['settings_role_'. $rid]['blogapi_uploadsize_'. $rid] = array(
       '#type' => 'textfield',
       '#title' => t('Maximum file size per upload'),
-      '#default_value' => variable_get('blogapi_uploadsize_' . $rid, $blogapi_uploadsize_default),
+      '#default_value' => variable_get('blogapi_uploadsize_'. $rid, $blogapi_uploadsize_default),
       '#size' => 5,
       '#maxlength' => 5,
       '#description' => t('The maximum size of a file a user can upload (in megabytes).'),
     );
-    $form['settings_role_' . $rid]['blogapi_usersize_' . $rid] = array(
+    $form['settings_role_'. $rid]['blogapi_usersize_'. $rid] = array(
       '#type' => 'textfield',
       '#title' => t('Total file size per user'),
-      '#default_value' => variable_get('blogapi_usersize_' . $rid, $blogapi_usersize_default),
+      '#default_value' => variable_get('blogapi_usersize_'. $rid, $blogapi_usersize_default),
       '#size' => 5,
       '#maxlength' => 5,
       '#description' => t('The maximum size of all files a user can have on the site (in megabytes).'),
     );
   }
 
-  return system_settings_form($form, FALSE);
+  return system_settings_form($form);
 }
 
-/**
- * Implement hook_menu().
- */
 function blogapi_menu() {
   $items['blogapi/rsd'] = array(
     'title' => 'RSD',
@@ -829,9 +808,6 @@ function blogapi_menu() {
   return $items;
 }
 
-/**
- * Implement hook_init().
- */
 function blogapi_init() {
   if (drupal_is_front_page()) {
     drupal_add_link(array('rel' => 'EditURI',
@@ -844,11 +820,11 @@ function blogapi_init() {
 function blogapi_rsd() {
   global $base_url;
 
-  $xmlrpc = $base_url . '/xmlrpc.php';
+  $xmlrpc = $base_url .'/xmlrpc.php';
   $base = url('', array('absolute' => TRUE));
   $blogid = 1; # until we figure out how to handle multiple bloggers
 
-  drupal_set_header('Content-Type', 'application/rsd+xml; charset=utf-8');
+  drupal_set_header('Content-Type: application/rsd+xml; charset=utf-8');
   print <<<__RSD__
 <?xml version="1.0"?>
 <rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd">
@@ -869,38 +845,42 @@ __RSD__;
 /**
  * Handles extra information sent by clients according to MovableType's spec.
  */
-function _blogapi_mt_extra($node, $struct) {
+function _blogapi_mt_extra(&$node, $struct) {
   if (is_array($node)) {
     $was_array = TRUE;
     $node = (object)$node;
   }
 
+  // mt_allow_comments
   if (array_key_exists('mt_allow_comments', $struct)) {
     switch ($struct['mt_allow_comments']) {
       case 0:
-        $node->comment = COMMENT_NODE_HIDDEN;
+        $node->comment = COMMENT_NODE_DISABLED;
         break;
       case 1:
-        $node->comment = COMMENT_NODE_OPEN;
+        $node->comment = COMMENT_NODE_READ_WRITE;
         break;
       case 2:
-        $node->comment = COMMENT_NODE_CLOSED;
+        $node->comment = COMMENT_NODE_READ_ONLY;
         break;
     }
   }
 
-  // Merge the 3 body sections (description, mt_excerpt, mt_text_more) into one body.
+  // merge the 3 body sections (description, mt_excerpt, mt_text_more) into
+  // one body
   if ($struct['mt_excerpt']) {
-    $node->body[0]['value'] = $struct['mt_excerpt'] . '<!--break-->' . $node->body[0]['value'];
+    $node->body = $struct['mt_excerpt'] .'<!--break-->'. $node->body;
   }
   if ($struct['mt_text_more']) {
-    $node->body[0]['value'] = $node->body[0]['value'] . '<!--extended-->' . $struct['mt_text_more'];
+    $node->body = $node->body .'<!--extended-->'. $struct['mt_text_more'];
   }
 
+  // mt_convert_breaks
   if ($struct['mt_convert_breaks']) {
-    $node->body[0]['format'] = $struct['mt_convert_breaks'];
+    $node->format = $struct['mt_convert_breaks'];
   }
 
+  // dateCreated
   if ($struct['dateCreated']) {
     $node->date = format_date(mktime($struct['dateCreated']->hour, $struct['dateCreated']->minute, $struct['dateCreated']->second, $struct['dateCreated']->month, $struct['dateCreated']->day, $struct['dateCreated']->year), 'custom', 'Y-m-d H:i:s O');
   }
@@ -916,24 +896,21 @@ function _blogapi_get_post($node, $bodies = TRUE) {
     'dateCreated' => xmlrpc_date($node->created),
     'title' => $node->title,
     'postid' => $node->nid,
-    'link' => url('node/' . $node->nid, array('absolute' => TRUE)),
-    'permaLink' => url('node/' . $node->nid, array('absolute' => TRUE)),
+    'link' => url('node/'. $node->nid, array('absolute' => TRUE)),
+    'permaLink' => url('node/'. $node->nid, array('absolute' => TRUE)),
   );
-
   if ($bodies) {
-    $body = $node->body[0]['value'];
-    $format = $node->body[0]['format'];
     if ($node->comment == 1) {
       $comment = 2;
     }
-    elseif ($node->comment == 2) {
+    else if ($node->comment == 2) {
       $comment = 1;
     }
-    $xmlrpcval['content'] = "<title>$node->title</title>$body";
-    $xmlrpcval['description'] = $body;
+    $xmlrpcval['content'] = "<title>$node->title</title>$node->body";
+    $xmlrpcval['description'] = $node->body;
     // Add MT specific fields
     $xmlrpcval['mt_allow_comments'] = (int) $comment;
-    $xmlrpcval['mt_convert_breaks'] = $format;
+    $xmlrpcval['mt_convert_breaks'] = $node->format;
   }
 
   return $xmlrpcval;
@@ -953,14 +930,13 @@ function _blogapi_validate_blogid($blogid) {
   if (in_array($blogid, $types, TRUE)) {
     return TRUE;
   }
-
   return blogapi_error(t("Blog API module is not configured to support the %type content type, or you don't have sufficient permissions to post this type of content.", array('%type' => $blogid)));
 }
 
 function _blogapi_get_node_types() {
   $available_types = array_keys(array_filter(variable_get('blogapi_node_types', array('blog' => 1))));
   $types = array();
-  foreach (node_type_get_types() as $type => $name) {
+  foreach (node_get_types() as $type => $name) {
     if (node_access('create', $type) && in_array($type, $available_types)) {
       $types[] = $type;
     }
@@ -970,6 +946,5 @@ function _blogapi_get_node_types() {
 }
 
 function _blogapi_space_used($uid) {
-  return db_query('SELECT SUM(filesize) FROM {blogapi_files} f WHERE f.uid = :uid', array(':uid' => $uid))->fetchField();
+  return db_result(db_query('SELECT SUM(filesize) FROM {blogapi_files} f WHERE f.uid = %d', $uid));
 }
-

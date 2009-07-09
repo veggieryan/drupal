@@ -1,5 +1,5 @@
 <?php
-// $Id: search.pages.inc,v 1.9 2009/05/25 10:43:53 dries Exp $
+// $Id: search.pages.inc,v 1.4 2007/12/06 09:51:01 goba Exp $
 
 /**
  * @file
@@ -26,42 +26,27 @@ function search_view($type = 'node') {
     $results = '';
     if (trim($keys)) {
       // Log the search keys:
-      watchdog('search', '%keys (@type).', array('%keys' => $keys, '@type' => module_invoke($type, 'search', 'name')), WATCHDOG_NOTICE, l(t('results'), 'search/' . $type . '/' . $keys));
+      watchdog('search', '%keys (@type).', array('%keys' => $keys, '@type' => module_invoke($type, 'search', 'name')), WATCHDOG_NOTICE, l(t('results'), 'search/'. $type .'/'. $keys));
 
       // Collect the search results:
       $results = search_data($keys, $type);
 
       if ($results) {
-        $results = theme('search_results_listing', t('Search results'), $results);
+        $results = theme('box', t('Search results'), $results);
       }
       else {
-        $results = theme('search_results_listing', t('Your search yielded no results'), search_help('search#noresults', drupal_help_arg()));
+        $results = theme('box', t('Your search yielded no results'), search_help('search#noresults', drupal_help_arg()));
       }
     }
 
     // Construct the search form.
-    $build['search_form'] = drupal_get_form('search_form', NULL, $keys, $type);
-    $build['search_results'] = array('#markup' => $results);
+    $output = drupal_get_form('search_form', NULL, $keys, $type);
+    $output .= $results;
 
-    return $build;
+    return $output;
   }
 
   return drupal_get_form('search_form', NULL, empty($keys) ? '' : $keys, $type);
-}
-
-/**
- * Theme the listing of search results
- *
- * @param $title
- *   The subject of the listing.
- * @param $content
- *   The content of the listing.
- * @return
- *   A string containing the listing output.
- */
-function theme_search_results_listing($title, $content) {
-  $output = '<h2 class="title">' . $title . '</h2><div>' . $content . '</div>';
-  return $output;
 }
 
 /**
@@ -78,9 +63,9 @@ function template_preprocess_search_results(&$variables) {
   foreach ($variables['results'] as $result) {
     $variables['search_results'] .= theme('search_result', $result, $variables['type']);
   }
-  $variables['pager'] = theme('pager', NULL);
+  $variables['pager'] = theme('pager', NULL, 10, 0);
   // Provide alternate search results template.
-  $variables['template_files'][] = 'search-results-' . $variables['type'];
+  $variables['template_files'][] = 'search-results-'. $variables['type'];
 }
 
 /**
@@ -116,7 +101,7 @@ function template_preprocess_search_result(&$variables) {
   $variables['info_split'] = $info;
   $variables['info'] = implode(' - ', $info);
   // Provide alternate search result template.
-  $variables['template_files'][] = 'search-result-' . $variables['type'];
+  $variables['template_files'][] = 'search-result-'. $variables['type'];
 }
 
 /**
@@ -140,6 +125,6 @@ function search_form_submit($form, &$form_state) {
   }
 
   $type = $form_state['values']['module'] ? $form_state['values']['module'] : 'node';
-  $form_state['redirect'] = 'search/' . $type . '/' . $keys;
+  $form_state['redirect'] = 'search/'. $type .'/'. $keys;
   return;
 }

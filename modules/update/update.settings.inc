@@ -1,5 +1,5 @@
 <?php
-// $Id: update.settings.inc,v 1.6 2009/04/29 03:57:21 webchick Exp $
+// $Id: update.settings.inc,v 1.3.2.1 2009/04/29 17:17:21 goba Exp $
 
 /**
  * @file
@@ -43,8 +43,8 @@ function update_settings() {
     '#description' => t('You can choose to send e-mail only if a security update is available, or to be notified about all newer versions. If there are updates available of Drupal core or any of your installed modules and themes, your site will always print a message on the <a href="@status_report">status report</a> page, and will also display an error message on administration pages if there is a security update.', array('@status_report' => url('admin/reports/status')))
   );
 
-  $form = system_settings_form($form, FALSE);
-  // Custom validation callback for the email notification setting.
+  $form = system_settings_form($form);
+  // Custom valiation callback for the email notification setting.
   $form['#validate'][] = 'update_settings_validate';
   // We need to call our own submit callback first, not the one from
   // system_settings_form(), so that we can process and save the emails.

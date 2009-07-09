@@ -1,8 +1,8 @@
 <?php
-// $Id: user-picture.tpl.php,v 1.4 2009/04/24 09:03:21 dries Exp $
+// $Id: user-picture.tpl.php,v 1.2 2007/08/07 08:39:36 goba Exp $
 
 /**
- * @file
+ * @file user-picture.tpl.php
  * Default theme implementation to present an picture configured for the
  * user's account.
  *
@@ -15,8 +15,6 @@
  * @see template_preprocess_user_picture()
  */
 ?>
-<?php if ($picture): ?>
-  <div class="picture">
-    <?php print $picture; ?>
-  </div>
-<?php endif; ?>
+<div class="picture">
+  <?php print $picture; ?>
+</div>

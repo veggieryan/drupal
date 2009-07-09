@@ -1,5 +1,5 @@
 <?php
-// $Id: language.inc,v 1.19 2009/02/01 16:45:53 dries Exp $
+// $Id: language.inc,v 1.14.2.1 2009/01/02 23:37:48 dries Exp $
 
 /**
  * @file
@@ -17,15 +17,15 @@ function language_initialize() {
   // Get a list of enabled languages.
   $languages = language_list('enabled');
   $languages = $languages[1];
-
+  
   switch ($mode) {
     case LANGUAGE_NEGOTIATION_NONE:
       return language_default();
 
     case LANGUAGE_NEGOTIATION_DOMAIN:
       foreach ($languages as $language) {
-        $host = parse_url($language->domain, PHP_URL_HOST);
-        if ($host && ($_SERVER['HTTP_HOST'] == $host)) {
+        $parts = parse_url($language->domain);
+        if (!empty($parts['host']) && ($_SERVER['HTTP_HOST'] == $parts['host'])) {
           return $language;
         }
       }
@@ -99,7 +99,7 @@ function language_from_browser() {
 }
 
 /**
- * Rewrite URLs with language based prefix. Parameters are the same
+ * Rewrite URL's with language based prefix. Parameters are the same
  * as those of the url() function.
  */
 function language_url_rewrite(&$path, &$options) {
@@ -136,7 +136,7 @@ function language_url_rewrite(&$path, &$options) {
 
       case LANGUAGE_NEGOTIATION_PATH:
         if (!empty($options['language']->prefix)) {
-          $options['prefix'] = $options['language']->prefix . '/';
+          $options['prefix'] = $options['language']->prefix .'/';
         }
         break;
     }

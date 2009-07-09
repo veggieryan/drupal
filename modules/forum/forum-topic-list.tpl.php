@@ -1,9 +1,9 @@
 <?php
-// $Id: forum-topic-list.tpl.php,v 1.6 2008/10/22 18:22:22 dries Exp $
+// $Id: forum-topic-list.tpl.php,v 1.4.2.1 2008/10/22 18:22:51 dries Exp $
 
 /**
- * @file
- * Default theme implementation to display a list of forum topics.
+ * @file forum-topic-list.tpl.php
+ * Theme implementation to display a list of forum topics.
  *
  * Available variables:
  * - $header: The table header. This is pre-generated with click-sorting

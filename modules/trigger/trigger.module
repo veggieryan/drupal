@@ -1,5 +1,5 @@
 <?php
-// $Id: trigger.module,v 1.40 2009/07/01 20:39:20 dries Exp $
+// $Id: trigger.module,v 1.13.2.3 2009/06/08 16:34:57 goba Exp $
 
 /**
  * @file
@@ -8,31 +8,31 @@
  */
 
 /**
- * Implement hook_help().
+ * Implementation of hook_help().
  */
 function trigger_help($path, $arg) {
-  $explanation = '<p>' . t('Triggers are system events, such as when new content is added or when a user logs in. Trigger module combines these triggers with actions (functional tasks), such as unpublishing content or e-mailing an administrator. The <a href="@url">Actions settings page</a> contains a list of existing actions and provides the ability to create and configure additional actions.', array('@url' => url('admin/settings/actions'))) . '</p>';
+  $explanation = '<p>'. t('Triggers are system events, such as when new content is added or when a user logs in. Trigger module combines these triggers with actions (functional tasks), such as unpublishing content or e-mailing an administrator. The <a href="@url">Actions settings page</a> contains a list of existing actions and provides the ability to create and configure additional actions.', array('@url' => url('admin/settings/actions'))) .'</p>';
   switch ($path) {
     case 'admin/build/trigger/comment':
-      return $explanation . '<p>' . t('Below you can assign actions to run when certain comment-related triggers happen. For example, you could promote a post to the front page when a comment is added.') . '</p>';
+      return $explanation .'<p>'. t('Below you can assign actions to run when certain comment-related triggers happen. For example, you could promote a post to the front page when a comment is added.') .'</p>';
     case 'admin/build/trigger/node':
-      return $explanation . '<p>' . t('Below you can assign actions to run when certain content-related triggers happen. For example, you could send an e-mail to an administrator when a post is created or updated.') . '</p>';
+      return $explanation .'<p>'. t('Below you can assign actions to run when certain content-related triggers happen. For example, you could send an e-mail to an administrator when a post is created or updated.') .'</p>';
     case 'admin/build/trigger/cron':
-      return $explanation . '<p>' . t('Below you can assign actions to run during each pass of a <a href="@cron">cron maintenance task</a>.', array('@cron' => url('admin/reports/status'))) . '</p>';
+      return $explanation .'<p>'. t('Below you can assign actions to run during each pass of a <a href="@cron">cron maintenance task</a>.', array('@cron' => url('admin/reports/status'))) .'</p>';
     case 'admin/build/trigger/taxonomy':
-      return $explanation . '<p>' . t('Below you can assign actions to run when certain taxonomy-related triggers happen. For example, you could send an e-mail to an administrator when a term is deleted.') . '</p>';
+      return $explanation .'<p>'. t('Below you can assign actions to run when certain taxonomy-related triggers happen. For example, you could send an e-mail to an administrator when a term is deleted.') .'</p>';
     case 'admin/build/trigger/user':
-      return $explanation . '<p>' . t("Below you can assign actions to run when certain user-related triggers happen. For example, you could send an e-mail to an administrator when a user account is deleted.") . '</p>';
+      return $explanation .'<p>'. t("Below you can assign actions to run when certain user-related triggers happen. For example, you could send an e-mail to an administrator when a user account is deleted.") .'</p>';
     case 'admin/help#trigger':
-      $output = '<p>' . t('The Trigger module provides the ability to trigger <a href="@actions">actions</a> upon system events, such as when new content is added or when a user logs in.', array('@actions' => url('admin/settings/actions'))) . '</p>';
-      $output .= '<p>' . t('The combination of actions and triggers can perform many useful tasks, such as e-mailing an administrator if a user account is deleted, or automatically unpublishing comments that contain certain words. By default, there are five "contexts" of events (Comments, Content, Cron, Taxonomy, and Users), but more may be added by additional modules.') . '</p>';
-      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@trigger">Trigger module</a>.', array('@trigger' => 'http://drupal.org/handbook/modules/trigger/')) . '</p>';
+      $output = '<p>'. t('The Trigger module provides the ability to trigger <a href="@actions">actions</a> upon system events, such as when new content is added or when a user logs in.', array('@actions' => url('admin/settings/actions'))) .'</p>';
+      $output .= '<p>'. t('The combination of actions and triggers can perform many useful tasks, such as e-mailing an administrator if a user account is deleted, or automatically unpublishing comments that contain certain words. By default, there are five "contexts" of events (Comments, Content, Cron, Taxonomy, and Users), but more may be added by additional modules.') .'</p>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@trigger">Trigger module</a>.', array('@trigger' => 'http://drupal.org/handbook/modules/trigger/')) .'</p>';
       return $output;
   }
 }
 
 /**
- * Implement hook_menu().
+ * Implementation of hook_menu().
  */
 function trigger_menu() {
   $items['admin/build/trigger'] = array(
@@ -41,6 +41,7 @@ function trigger_menu() {
     'page callback' => 'trigger_assign',
     'access callback' => 'trigger_access_check',
     'access arguments' => array('node'),
+    'file' => 'trigger.admin.inc',
   );
   // We don't use a menu wildcard here because these are tabs,
   // not invisible items.
@@ -51,6 +52,7 @@ function trigger_menu() {
     'access callback' => 'trigger_access_check',
     'access arguments' => array('node'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'trigger.admin.inc',
   );
   $items['admin/build/trigger/user'] = array(
     'title' => 'Users',
@@ -59,6 +61,7 @@ function trigger_menu() {
     'access callback' => 'trigger_access_check',
     'access arguments' => array('user'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'trigger.admin.inc',
   );
   $items['admin/build/trigger/comment'] = array(
     'title' => 'Comments',
@@ -67,6 +70,7 @@ function trigger_menu() {
     'access callback' => 'trigger_access_check',
     'access arguments' => array('comment'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'trigger.admin.inc',
   );
   $items['admin/build/trigger/taxonomy'] = array(
     'title' => 'Taxonomy',
@@ -75,6 +79,7 @@ function trigger_menu() {
     'access callback' => 'trigger_access_check',
     'access arguments' => array('taxonomy'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'trigger.admin.inc',
   );
   $items['admin/build/trigger/cron'] = array(
     'title' => 'Cron',
@@ -82,6 +87,7 @@ function trigger_menu() {
     'page arguments' => array('cron'),
     'access arguments' => array('administer actions'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'trigger.admin.inc',
   );
 
   // We want contributed modules to be able to describe
@@ -92,10 +98,7 @@ function trigger_menu() {
     if (in_array($module, array('node', 'comment', 'user', 'system', 'taxonomy'))) {
       continue;
     }
-    $info = db_select('system')
-      ->condition('name', $module)
-      ->execute()
-      ->fetchField();
+    $info = db_result(db_query("SELECT info FROM {system} WHERE name = '%s'", $module));
     $info = unserialize($info);
     $nice_name = $info['name'];
     $items["admin/build/trigger/$module"] = array(
@@ -104,6 +107,7 @@ function trigger_menu() {
       'page arguments' => array($module),
       'access arguments' => array($module),
       'type' => MENU_LOCAL_TASK,
+      'file' => 'trigger.admin.inc',
     );
   }
   $items['admin/build/trigger/unassign'] = array(
@@ -113,6 +117,7 @@ function trigger_menu() {
     'page arguments' => array('trigger_unassign'),
     'access arguments' => array('administer actions'),
     'type' => MENU_CALLBACK,
+    'file' => 'trigger.admin.inc',
   );
 
   return $items;
@@ -137,14 +142,16 @@ function trigger_access_check($module) {
  *   An array of action IDs.
  */
 function _trigger_get_hook_aids($hook, $op = '') {
-  return db_query("SELECT ta.aid, a.type FROM {trigger_assignments} ta LEFT JOIN {actions} a ON ta.aid = a.aid WHERE ta.hook = :hook AND ta.op = :op ORDER BY ta.weight", array(
-    ':hook' => $hook,
-    ':op' => $op,
-  ))->fetchAllKeyed();
+  $aids = array();
+  $result = db_query("SELECT aa.aid, a.type FROM {trigger_assignments} aa LEFT JOIN {actions} a ON aa.aid = a.aid WHERE aa.hook = '%s' AND aa.op = '%s' ORDER BY weight", $hook, $op);
+  while ($action = db_fetch_object($result)) {
+    $aids[$action->aid]['type'] = $action->type;
+  }
+  return $aids;
 }
 
 /**
- * Implement hook_theme().
+ * Implementation of hook_theme().
  */
 function trigger_theme() {
   return array(
@@ -156,7 +163,7 @@ function trigger_theme() {
 }
 
 /**
- * Implement hook_forms(). We reuse code by using the
+ * Implementation of hook_forms(). We reuse code by using the
  * same assignment form definition for each node-op combination.
  */
 function trigger_forms() {
@@ -164,7 +171,7 @@ function trigger_forms() {
   foreach ($hooks as $module => $info) {
     foreach ($hooks[$module] as $hook => $ops) {
       foreach ($ops as $op => $description) {
-        $forms['trigger_' . $hook . '_' . $op . '_assign_form'] = array('callback' => 'trigger_assign_form');
+        $forms['trigger_'. $hook .'_'. $op .'_assign_form'] = array('callback' => 'trigger_assign_form');
       }
     }
   }
@@ -182,7 +189,7 @@ function trigger_forms() {
  * @param $type
  *   The type of action that is about to be called.
  * @param $node
- *   The node that was passed via the node hook.
+ *   The node that was passed via the nodeapi hook.
  * @return
  *   The object expected by the action that is about to be called.
  */
@@ -196,85 +203,49 @@ function _trigger_normalize_node_context($type, $node) {
     // An action that works on users is being called in a node context.
     // Load the user object of the node's author.
     case 'user':
-      return user_load($node->uid);
+      return user_load(array('uid' => $node->uid));
   }
 }
 
 /**
- * Simple wrapper function to make user hooks work with new entry points.
- *
- * @TODO: Take advantage of the new API and reorganise/remove this function.
+ * Implementation of hook_nodeapi().
  */
-function _trigger_node($node, $op, $a3 = NULL, $a4 = NULL) {
+function trigger_nodeapi(&$node, $op, $a3, $a4) {
   // Keep objects for reuse so that changes actions make to objects can persist.
   static $objects;
   // Prevent recursion by tracking which operations have already been called.
   static $recursion;
-  if (isset($recursion[$op])) {
+  // Support a subset of operations.
+  if (!in_array($op, array('view', 'update', 'presave', 'insert', 'delete')) || isset($recursion[$op])) {
     return;
   }
   $recursion[$op] = TRUE;
 
-  $aids = _trigger_get_hook_aids('node', $op);
+  $aids = _trigger_get_hook_aids('nodeapi', $op);
   if (!$aids) {
     return;
   }
   $context = array(
-    'hook' => 'node',
+    'hook' => 'nodeapi',
     'op' => $op,
   );
 
   // We need to get the expected object if the action's type is not 'node'.
   // We keep the object in $objects so we can reuse it if we have multiple actions
   // that make changes to an object.
-  foreach ($aids as $aid => $type) {
-    if ($type != 'node') {
-      if (!isset($objects[$type])) {
-        $objects[$type] = _trigger_normalize_node_context($type, $node);
+  foreach ($aids as $aid => $action_info) {
+    if ($action_info['type'] != 'node') {
+      if (!isset($objects[$action_info['type']])) {
+        $objects[$action_info['type']] = _trigger_normalize_node_context($action_info['type'], $node);
       }
       // Since we know about the node, we pass that info along to the action.
       $context['node'] = $node;
-      $result = actions_do($aid, $objects[$type], $context, $a3, $a4);
+      $result = actions_do($aid, $objects[$action_info['type']], $context, $a3, $a4);
     }
     else {
       actions_do($aid, $node, $context, $a3, $a4);
     }
   }
-}
-
-/**
- * Implement hook_node_view().
- */
-function trigger_node_view($node, $build_mode) {
-  _trigger_node($node, 'view', $build_mode);
-}
-
-/**
- * Implement hook_node_update().
- */
-function trigger_node_update($node) {
-  _trigger_node($node, 'update');
-}
-
-/**
- * Implement hook_node_presave().
- */
-function trigger_node_presave($node) {
-  _trigger_node($node, 'presave');
-}
-
-/**
- * Implement hook_node_insert().
- */
-function trigger_node_insert($node) {
-  _trigger_node($node, 'insert');
-}
-
-/**
- * Implement hook_node_delete().
- */
-function trigger_node_delete($node) {
-  _trigger_node($node, 'delete');
 }
 
 /**
@@ -299,50 +270,20 @@ function _trigger_normalize_comment_context($type, $comment) {
 
     // An action that works on users is being called in a comment context.
     case 'user':
-      return user_load(is_array($comment) ? $comment['uid'] : $comment->uid);
+      return user_load(array('uid' => is_array($comment) ? $comment['uid'] : $comment->uid));
   }
 }
 
 /**
- * Implement hook_comment_insert().
+ * Implementation of hook_comment().
  */
-function trigger_comment_insert($comment) {
-  _trigger_comment($comment, 'insert');
-}
-
-/**
- * Implement hook_comment_update().
- */
-function trigger_comment_update($comment) {
-  _trigger_comment($comment, 'update');
-}
-
-/**
- * Implement hook_comment_delete().
- */
-function trigger_comment_delete($comment) {
-  _trigger_comment($comment, 'delete');
-}
-
-/**
- * Implement hook_comment_view().
- */
-function trigger_comment_view($comment) {
-  _trigger_comment($comment, 'view');
-}
-
-/**
- * Helper function for implementations of hook_comment_op().
- *
- * @param $a1
- *   Argument, which will be passed to the action.
- *   It can be a array of form values or a comment.
- * @param $op
- *   What kind of action is being performed.
- */
-function _trigger_comment($a1, $op) {
+function trigger_comment($a1, $op) {
   // Keep objects for reuse so that changes actions make to objects can persist.
   static $objects;
+  // We support a subset of operations.
+  if (!in_array($op, array('insert', 'update', 'delete', 'view'))) {
+    return;
+  }
   $aids = _trigger_get_hook_aids('comment', $op);
   $context = array(
     'hook' => 'comment',
@@ -351,25 +292,25 @@ function _trigger_comment($a1, $op) {
   // We need to get the expected object if the action's type is not 'comment'.
   // We keep the object in $objects so we can reuse it if we have multiple actions
   // that make changes to an object.
-  foreach ($aids as $aid => $type) {
-    if ($type != 'comment') {
-      if (!isset($objects[$type])) {
-        $objects[$type] = _trigger_normalize_comment_context($type, $a1);
+  foreach ($aids as $aid => $action_info) {
+    if ($action_info['type'] != 'comment') {
+      if (!isset($objects[$action_info['type']])) {
+        $objects[$action_info['type']] = _trigger_normalize_comment_context($action_info['type'], $a1);
       }
       // Since we know about the comment, we pass it along to the action
       // in case it wants to peek at it.
       $context['comment'] = (object) $a1;
-      actions_do($aid, $objects[$type], $context);
+      actions_do($aid, $objects[$action_info['type']], $context);
     }
     else {
-      $a1 = (object) $a1;
-      actions_do($aid, $a1, $context);
+      $comment = (object) $a1;
+      actions_do($aid, $comment, $context);
     }
   }
 }
 
 /**
- * Implement hook_cron().
+ * Implementation of hook_cron().
  */
 function trigger_cron() {
   $aids = _trigger_get_hook_aids('cron', 'run');
@@ -414,73 +355,28 @@ function _trigger_normalize_user_context($type, $account) {
 }
 
 /**
- * trigger_user_login
+ * Implementation of hook_user().
  */
-function trigger_user_login(&$edit, &$account, $category) {
-  _trigger_user('login', $edit, $account, $category);
-}
-
-/**
- * Implement hook_user_logout().
- */
-function trigger_user_logout($edit, $account) {
-  _trigger_user('logout', $edit, $account);
-}
-
-/**
- * Implement hook_user_insert().
- */
-function trigger_user_insert(&$edit, &$account, $category) {
-  _trigger_user('insert', $edit, $account, $category);
-}
-
-/**
- * Implement hook_user_update().
- */
-function trigger_user_update(&$edit, &$account, $category) {
-  _trigger_user('update', $edit, $account, $category);
-}
-
-/**
- * Implement hook_user_cancel().
- */
-function trigger_user_cancel($edit, $account, $method) {
-  switch ($method) {
-    case 'user_cancel_reassign':
-    case 'user_cancel_delete':
-      _trigger_user('delete', $edit, $account, $method);
-      break;
-  }
-}
-
-/**
- * Implement hook_user_view().
- */
-function trigger_user_view(&$edit, &$account, $category) {
-  _trigger_user('view', $edit, $account, $category);
-}
-
-/**
- * Simple wrapper function to make user hooks work with new entry points.
- *
- * @TODO: Take advantage of the new API and reorganise/remove this function.
- */
-function _trigger_user($op, &$edit, &$account, $category = NULL) {
+function trigger_user($op, &$edit, &$account, $category = NULL) {
   // Keep objects for reuse so that changes actions make to objects can persist.
   static $objects;
+  // We support a subset of operations.
+  if (!in_array($op, array('login', 'logout', 'insert', 'update', 'delete', 'view'))) {
+    return;
+  }
   $aids = _trigger_get_hook_aids('user', $op);
   $context = array(
     'hook' => 'user',
     'op' => $op,
     'form_values' => &$edit,
   );
-  foreach ($aids as $aid => $type) {
-    if ($type != 'user') {
-      if (!isset($objects[$type])) {
-        $objects[$type] = _trigger_normalize_user_context($type, $account);
+  foreach ($aids as $aid => $action_info) {
+    if ($action_info['type'] != 'user') {
+      if (!isset($objects[$action_info['type']])) {
+        $objects[$action_info['type']] = _trigger_normalize_user_context($action_info['type'], $account);
       }
       $context['account'] = $account;
-      actions_do($aid, $objects[$type], $context);
+      actions_do($aid, $objects[$action_info['type']], $context);
     }
     else {
       actions_do($aid, $account, $context, $category);
@@ -489,7 +385,7 @@ function _trigger_user($op, &$edit, &$account, $category = NULL) {
 }
 
 /**
- * Implement hook_taxonomy().
+ * Implementation of hook_taxonomy().
  */
 function trigger_taxonomy($op, $type, $array) {
   if ($type != 'term') {
@@ -500,7 +396,10 @@ function trigger_taxonomy($op, $type, $array) {
     'hook' => 'taxonomy',
     'op' => $op
   );
-  actions_do(array_keys($aids), (object) $array, $context);
+  foreach ($aids as $aid => $action_info) {
+    $taxonomy_object = (object) $array;
+    actions_do($aid, $taxonomy_object, $context);
+  }
 }
 
 /**
@@ -527,12 +426,10 @@ function trigger_options($type = 'all') {
 }
 
 /**
- * Implement hook_actions_delete().
+ * Implementation of hook_actions_delete().
  *
  * Remove all trigger entries for the given action, when deleted.
  */
 function trigger_actions_delete($aid) {
-  db_delete('trigger_assignments')
-    ->condition('aid', $aid)
-    ->execute();
+  db_query("DELETE FROM {trigger_assignments} WHERE aid = '%s'", $aid);
 }

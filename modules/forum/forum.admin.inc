@@ -1,5 +1,5 @@
 <?php
-// $Id: forum.admin.inc,v 1.21 2009/06/29 14:24:56 webchick Exp $
+// $Id: forum.admin.inc,v 1.8.2.1 2009/05/26 08:13:00 goba Exp $
 
 /**
  * @file
@@ -79,13 +79,12 @@ function forum_form_submit($form, &$form_state) {
     $type = t('forum');
   }
 
-  $term = (object) $form_state['values'];
-  $status = taxonomy_term_save($term);
+  $status = taxonomy_save_term($form_state['values']);
   switch ($status) {
     case SAVED_NEW:
       if ($container) {
         $containers = variable_get('forum_containers', array());
-        $containers[] = $term->tid;
+        $containers[] = $form_state['values']['tid'];
         variable_set('forum_containers', $containers);
       }
       drupal_set_message(t('Created new @type %term.', array('%term' => $form_state['values']['name'], '@type' => $type)));
@@ -94,7 +93,7 @@ function forum_form_submit($form, &$form_state) {
       drupal_set_message(t('The @type %term has been updated.', array('%term' => $form_state['values']['name'], '@type' => $type)));
       break;
   }
-  $form_state['redirect'] = 'admin/build/forum';
+  $form_state['redirect'] = 'admin/content/forum';
   return;
 }
 
@@ -161,23 +160,23 @@ function forum_form_container(&$form_state, $edit = array()) {
  * @param $tid ID of the term to be deleted
  */
 function forum_confirm_delete(&$form_state, $tid) {
-  $term = taxonomy_term_load($tid);
+  $term = taxonomy_get_term($tid);
 
   $form['tid'] = array('#type' => 'value', '#value' => $tid);
   $form['name'] = array('#type' => 'value', '#value' => $term->name);
 
-  return confirm_form($form, t('Are you sure you want to delete the forum %name?', array('%name' => $term->name)), 'admin/build/forum', t('Deleting a forum or container will also delete its sub-forums, if any. To delete posts in this forum, visit <a href="@content">content administration</a> first. This action cannot be undone.', array('@content' => url('admin/content/node'))), t('Delete'), t('Cancel'));
+  return confirm_form($form, t('Are you sure you want to delete the forum %name?', array('%name' => $term->name)), 'admin/content/forum', t('Deleting a forum or container will also delete its sub-forums, if any. To delete posts in this forum, visit <a href="@content">content administration</a> first. This action cannot be undone.', array('@content' => url('admin/content/node'))), t('Delete'), t('Cancel'));
 }
 
 /**
- * Implement forms api _submit call. Deletes a forum after confirmation.
+ * Implementation of forms api _submit call. Deletes a forum after confirmation.
  */
 function forum_confirm_delete_submit($form, &$form_state) {
-  taxonomy_term_delete($form_state['values']['tid']);
-  drupal_set_message(t('The forum %term and all sub-forums have been deleted.', array('%term' => $form_state['values']['name'])));
-  watchdog('content', 'forum: deleted %term and all its sub-forums.', array('%term' => $form_state['values']['name']));
+  taxonomy_del_term($form_state['values']['tid']);
+  drupal_set_message(t('The forum %term and all sub-forums and associated posts have been deleted.', array('%term' => $form_state['values']['name'])));
+  watchdog('content', 'forum: deleted %term and all its sub-forums and associated posts.', array('%term' => $form_state['values']['name']));
 
-  $form_state['redirect'] = 'admin/build/forum';
+  $form_state['redirect'] = 'admin/content/forum';
   return;
 }
 
@@ -191,25 +190,25 @@ function forum_admin_settings() {
   $number = drupal_map_assoc(array(5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 80, 100, 150, 200, 250, 300, 350, 400, 500));
   $form['forum_hot_topic'] = array('#type' => 'select',
     '#title' => t('Hot topic threshold'),
-    '#default_value' => 15,
+    '#default_value' => variable_get('forum_hot_topic', 15),
     '#options' => $number,
     '#description' => t('The number of posts a topic must have to be considered "hot".'),
   );
   $number = drupal_map_assoc(array(10, 25, 50, 75, 100));
   $form['forum_per_page'] = array('#type' => 'select',
     '#title' => t('Topics per page'),
-    '#default_value' => 25,
+    '#default_value' => variable_get('forum_per_page', 25),
     '#options' => $number,
     '#description' => t('Default number of forum topics displayed per page.'),
   );
   $forder = array(1 => t('Date - newest first'), 2 => t('Date - oldest first'), 3 => t('Posts - most active first'), 4 => t('Posts - least active first'));
   $form['forum_order'] = array('#type' => 'radios',
     '#title' => t('Default order'),
-    '#default_value' => '1',
+    '#default_value' => variable_get('forum_order', '1'),
     '#options' => $forder,
     '#description' => t('Default display order for topics.'),
   );
-  return system_settings_form($form, TRUE);
+  return system_settings_form($form);
 }
 
 /**
@@ -225,12 +224,12 @@ function forum_overview(&$form_state) {
   foreach (element_children($form) as $key) {
     if (isset($form[$key]['#term'])) {
       $term = $form[$key]['#term'];
-      $form[$key]['view']['#markup'] = l($term['name'], 'forum/' . $term['tid']);
+      $form[$key]['view']['#value'] = l($term['name'], 'forum/'. $term['tid']);
       if (in_array($form[$key]['#term']['tid'], variable_get('forum_containers', array()))) {
-        $form[$key]['edit']['#markup'] = l(t('edit container'), 'admin/build/forum/edit/container/' . $term['tid']);
+        $form[$key]['edit']['#value'] = l(t('edit container'), 'admin/content/forum/edit/container/'. $term['tid']);
       }
       else {
-        $form[$key]['edit']['#markup'] = l(t('edit forum'), 'admin/build/forum/edit/forum/' . $term['tid']);
+        $form[$key]['edit']['#value'] = l(t('edit forum'), 'admin/content/forum/edit/forum/'. $term['tid']);
       }
     }
   }
@@ -242,7 +241,7 @@ function forum_overview(&$form_state) {
   $form['#theme'] = 'taxonomy_overview_terms';
   $form['#submit'] = array('taxonomy_overview_terms_submit'); // Use the existing taxonomy overview submit handler.
   $form['#validate'] = array('taxonomy_overview_terms_validate');
-  $form['#empty_text'] = t('No containers or forums available. <a href="@container">Add container</a> or <a href="@forum">Add forum</a>.', array('@container' => url('admin/build/forum/add/container'), '@forum' => url('admin/build/forum/add/forum')));
+  $form['#empty_text'] = '<em>'. t('There are no existing containers or forums. Containers and forums may be added using the <a href="@container">add container</a> and <a href="@forum">add forum</a> pages.', array('@container' => url('admin/content/forum/add/container'), '@forum' => url('admin/content/forum/add/forum'))) .'</em>';
   return $form;
 }
 
@@ -274,7 +273,7 @@ function _forum_parent_select($tid, $title, $child_type) {
   $exclude[] = $tid;
 
   $tree = taxonomy_get_tree($vid);
-  $options[0] = '<' . t('root') . '>';
+  $options[0] = '<'. t('root') .'>';
   if ($tree) {
     foreach ($tree as $term) {
       if (!in_array($term->tid, $exclude)) {
@@ -285,7 +284,7 @@ function _forum_parent_select($tid, $title, $child_type) {
   if ($child_type == 'container') {
     $description = t('Containers are usually placed at the top (root) level, but may also be placed inside another container or forum.');
   }
-  elseif ($child_type == 'forum') {
+  else if ($child_type == 'forum') {
     $description = t('Forums may be placed at the top (root) level, or inside another container or forum.');
   }
 

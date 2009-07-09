@@ -1,8 +1,8 @@
 <?php
-// $Id: forum-topic-navigation.tpl.php,v 1.4 2009/02/18 14:28:22 webchick Exp $
+// $Id: forum-topic-navigation.tpl.php,v 1.2 2007/08/07 08:39:35 goba Exp $
 
 /**
- * @file
+ * @file forum-topic-navigation.tpl.php
  * Default theme implementation to display the topic navigation string at the
  * bottom of all forum topics.
  *
@@ -24,7 +24,7 @@
  */
 ?>
 <?php if ($prev || $next): ?>
-  <div class="forum-topic-navigation clearfix">
+  <div class="forum-topic-navigation clear-block">
     <?php if ($prev): ?>
       <a href="<?php print $prev_url; ?>" class="topic-previous" title="<?php print t('Go to previous forum topic') ?>">‹ <?php print $prev_title ?></a>
     <?php endif; ?>

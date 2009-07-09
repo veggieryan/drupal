@@ -1,5 +1,5 @@
 <?php
-// $Id: theme.maintenance.inc,v 1.30 2009/06/06 16:05:26 dries Exp $
+// $Id: theme.maintenance.inc,v 1.10 2008/01/24 09:42:50 goba Exp $
 
 /**
  * @file
@@ -8,7 +8,7 @@
 
 /**
  * Sets up the theming system for site installs, updates and when the site is
- * in maintenance mode. It also applies when the database is unavailable.
+ * in off-line mode. It also applies when the database is unavailable.
  *
  * Minnelli is always used for the initial install and update operations. In
  * other cases, "settings.php" must have a "maintenance_theme" key set for the
@@ -22,13 +22,13 @@ function _drupal_maintenance_theme() {
     return;
   }
 
-  require_once DRUPAL_ROOT . '/includes/path.inc';
-  require_once DRUPAL_ROOT . '/includes/theme.inc';
-  require_once DRUPAL_ROOT . '/includes/common.inc';
-  require_once DRUPAL_ROOT . '/includes/unicode.inc';
-  require_once DRUPAL_ROOT . '/includes/file.inc';
-  require_once DRUPAL_ROOT . '/includes/module.inc';
-  require_once DRUPAL_ROOT . '/includes/database/database.inc';
+  require_once './includes/path.inc';
+  require_once './includes/theme.inc';
+  require_once './includes/common.inc';
+  require_once './includes/unicode.inc';
+  require_once './includes/file.inc';
+  require_once './includes/module.inc';
+  require_once './includes/database.inc';
   unicode_check();
 
   // Install and update pages are treated differently to prevent theming overrides.
@@ -39,7 +39,7 @@ function _drupal_maintenance_theme() {
     // Load module basics (needed for hook invokes).
     $module_list['system']['filename'] = 'modules/system/system.module';
     $module_list['filter']['filename'] = 'modules/filter/filter.module';
-    module_list(TRUE, FALSE, $module_list);
+    module_list(TRUE, FALSE, FALSE, $module_list);
     drupal_load('module', 'system');
     drupal_load('module', 'filter');
 
@@ -62,11 +62,10 @@ function _drupal_maintenance_theme() {
 
   // These are usually added from system_init() -except maintenance.css.
   // When the database is inactive it's not called so we add it here.
-  drupal_add_css(drupal_get_path('module', 'system') . '/defaults.css');
-  drupal_add_css(drupal_get_path('module', 'system') . '/system.css');
-  drupal_add_css(drupal_get_path('module', 'system') . '/system-menus.css');
-  drupal_add_css(drupal_get_path('module', 'system') . '/maintenance.css');
-  drupal_add_css(drupal_get_path('module', 'system') . '/admin.css');
+  drupal_add_css(drupal_get_path('module', 'system') .'/defaults.css', 'module');
+  drupal_add_css(drupal_get_path('module', 'system') .'/system.css', 'module');
+  drupal_add_css(drupal_get_path('module', 'system') .'/system-menus.css', 'module');
+  drupal_add_css(drupal_get_path('module', 'system') .'/maintenance.css', 'module');
 }
 
 /**
@@ -88,12 +87,12 @@ function theme_task_list($items, $active = NULL) {
   foreach ($items as $k => $item) {
     if ($active == $k) {
       $class = 'active';
-      $done = FALSE;
+      $done = false;
     }
     else {
       $class = $done ? 'done' : '';
     }
-    $output .= '<li class="' . $class . '">' . $item . '</li>';
+    $output .= '<li class="'. $class .'">'. $item .'</li>';
   }
   $output .= '</ol>';
   return $output;
@@ -108,38 +107,35 @@ function theme_task_list($items, $active = NULL) {
  *   The page content to show.
  */
 function theme_install_page($content) {
-  drupal_set_header('Content-Type', 'text/html; charset=utf-8');
+  drupal_set_header('Content-Type: text/html; charset=utf-8');
 
   // Assign content.
   $variables['content'] = $content;
   // Delay setting the message variable so it can be processed below.
   $variables['show_messages'] = FALSE;
-  // Variable processors invoked manually since this function and theme_update_page()
-  // are exceptions in how it works within the theme system.
-  template_preprocess($variables, 'install_page');
+  // The maintenance preprocess function is recycled here.
   template_preprocess_maintenance_page($variables);
-  template_process($variables, 'install_page');
 
   // Special handling of error messages
   $messages = drupal_set_message();
   if (isset($messages['error'])) {
     $title = count($messages['error']) > 1 ? st('The following errors must be resolved before you can continue the installation process') : st('The following error must be resolved before you can continue the installation process');
-    $variables['messages'] .= '<h3>' . $title . ':</h3>';
+    $variables['messages'] .= '<h3>'. $title .':</h3>';
     $variables['messages'] .= theme('status_messages', 'error');
-    $variables['content'] .= '<p>' . st('Please check the error messages and <a href="!url">try again</a>.', array('!url' => request_uri())) . '</p>';
+    $variables['content'] .= '<p>'. st('Please check the error messages and <a href="!url">try again</a>.', array('!url' => request_uri())) .'</p>';
   }
-
+  
   // Special handling of warning messages
   if (isset($messages['warning'])) {
     $title = count($messages['warning']) > 1 ? st('The following installation warnings should be carefully reviewed') : st('The following installation warning should be carefully reviewed');
-    $variables['messages'] .= '<h4>' . $title . ':</h4>';
+    $variables['messages'] .= '<h4>'. $title .':</h4>';
     $variables['messages'] .= theme('status_messages', 'warning');
   }
 
   // Special handling of status messages
   if (isset($messages['status'])) {
     $title = count($messages['status']) > 1 ? st('The following installation warnings should be carefully reviewed, but in most cases may be safely ignored') : st('The following installation warning should be carefully reviewed, but in most cases may be safely ignored');
-    $variables['messages'] .= '<h4>' . $title . ':</h4>';
+    $variables['messages'] .= '<h4>'. $title .':</h4>';
     $variables['messages'] .= theme('status_messages', 'status');
   }
 
@@ -165,22 +161,19 @@ function theme_install_page($content) {
  */
 function theme_update_page($content, $show_messages = TRUE) {
   // Set required headers.
-  drupal_set_header('Content-Type', 'text/html; charset=utf-8');
+  drupal_set_header('Content-Type: text/html; charset=utf-8');
 
   // Assign content and show message flag.
   $variables['content'] = $content;
   $variables['show_messages'] = $show_messages;
-  // Variable processors invoked manually since this function and theme_install_page()
-  // are exceptions in how it works within the theme system.
-  template_preprocess($variables, 'update_page');
+  // The maintenance preprocess function is recycled here.
   template_preprocess_maintenance_page($variables);
-  template_process($variables, 'update_page');
 
   // Special handling of warning messages.
   $messages = drupal_set_message();
   if (isset($messages['warning'])) {
     $title = count($messages['warning']) > 1 ? 'The following update warnings should be carefully reviewed before continuing' : 'The following update warning should be carefully reviewed before continuing';
-    $variables['messages'] .= '<h4>' . $title . ':</h4>';
+    $variables['messages'] .= '<h4>'. $title .':</h4>';
     $variables['messages'] .= theme('status_messages', 'warning');
   }
 
@@ -212,24 +205,18 @@ function theme_update_page($content, $show_messages = TRUE) {
 function template_preprocess_maintenance_page(&$variables) {
   // Add favicon
   if (theme_get_setting('toggle_favicon')) {
-    $favicon = theme_get_setting('favicon');
-    $type = file_get_mimetype($favicon);
-    // Use the genereic MIME type for favicons if no other was found.
-    if ($type == 'application/octet-stream') {
-      $type = 'image/x-icon';
-    }
-    drupal_add_html_head('<link rel="shortcut icon" href="' . check_url($favicon) . '" type="' . check_plain($type) . '" />');
+    drupal_set_html_head('<link rel="shortcut icon" href="'. check_url(theme_get_setting('favicon')) .'" type="image/x-icon" />');
   }
 
   global $theme;
   // Retrieve the theme data to list all available regions.
-  $theme_data = _system_get_theme_data();
+  $theme_data = _system_theme_data();
   $regions = $theme_data[$theme]->info['regions'];
 
-  // Get all region content set with drupal_add_region_content().
+  // Get all region content set with drupal_set_content().
   foreach (array_keys($regions) as $region) {
     // Assign region to a region variable.
-    $region_content = drupal_get_region_content($region);
+    $region_content = drupal_get_content($region);
     isset($variables[$region]) ? $variables[$region] .= $region_content : $variables[$region] = $region_content;
   }
 
@@ -254,17 +241,18 @@ function template_preprocess_maintenance_page(&$variables) {
   }
   $variables['head_title']        = implode(' | ', $head_title);
   $variables['base_path']         = base_path();
-  $variables['front_page']        = url();
   $variables['breadcrumb']        = '';
   $variables['feed_icons']        = '';
+  $variables['footer_message']    = filter_xss_admin(variable_get('site_footer', FALSE));
   $variables['head']              = drupal_get_html_head();
   $variables['help']              = '';
   $variables['language']          = $GLOBALS['language'];
   $variables['language']->dir     = $GLOBALS['language']->direction ? 'rtl' : 'ltr';
   $variables['logo']              = theme_get_setting('logo');
   $variables['messages']          = $variables['show_messages'] ? theme('status_messages') : '';
-  $variables['main_menu']         = array();
-  $variables['secondary_menu']    = array();
+  $variables['mission']           = '';
+  $variables['primary_links']     = array();
+  $variables['secondary_links']   = array();
   $variables['search_box']        = '';
   $variables['site_name']         = (theme_get_setting('toggle_name') ? variable_get('site_name', 'Drupal') : '');
   $variables['site_slogan']       = (theme_get_setting('toggle_slogan') ? variable_get('site_slogan', '') : '');
@@ -276,19 +264,21 @@ function template_preprocess_maintenance_page(&$variables) {
   $variables['closure']           = '';
 
   // Compile a list of classes that are going to be applied to the body element.
-  $variables['classes_array'][] = 'in-maintenance';
+  $body_classes = array();
+  $body_classes[] = 'in-maintenance';
   if (isset($variables['db_is_active']) && !$variables['db_is_active']) {
-    $variables['classes_array'][] = 'db-offline';
+    $body_classes[] = 'db-offline';
   }
   if ($variables['layout'] == 'both') {
-    $variables['classes_array'][] = 'two-sidebars';
+    $body_classes[] = 'two-sidebars';
   }
   elseif ($variables['layout'] == 'none') {
-    $variables['classes_array'][] = 'no-sidebars';
+    $body_classes[] = 'no-sidebars';
   }
   else {
-    $variables['classes_array'][] = 'one-sidebar sidebar-' . $variables['layout'];
+    $body_classes[] = 'one-sidebar sidebar-'. $variables['layout'];
   }
+  $variables['body_classes'] = implode(' ', $body_classes);
 
   // Dead databases will show error messages so supplying this template will
   // allow themers to override the page and the content completely.

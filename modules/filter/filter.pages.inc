@@ -1,5 +1,5 @@
 <?php
-// $Id: filter.pages.inc,v 1.7 2009/03/08 21:25:18 dries Exp $
+// $Id: filter.pages.inc,v 1.2 2007/11/10 17:41:18 dries Exp $
 
 /**
  * @file
@@ -23,37 +23,16 @@ function filter_tips_long() {
 
 
 /**
- * Render HTML for a set of filter tips.
+ * Format a set of filter tips.
  *
- * @param $tips
- *   An array containing descriptions and a CSS id in the form of
- *   'module-name/filter-id' (only used when $long is TRUE) for each
- *   filter in one or more text formats. Example:
- *   @code
- *     array(
- *       'Full HTML' => array(
- *         0 => array(
- *           'tip' => 'Web page addresses and e-mail addresses turn into links automatically.',
- *           'id' => 'filter/2',
- *         ),
- *       ),
- *     );
- *   @endcode
- * @param $long
- *   (optional) Whether the passed in filter tips contain extended explanations,
- *   i.e. intended to be output on the path 'filter/tips' (TRUE), or are in a
- *   short format, i.e. suitable to be displayed below a form element. Defaults
- *   to FALSE.
- *
- * @see _filter_tips()
  * @ingroup themeable
  */
-function theme_filter_tips($tips, $long = FALSE) {
+function theme_filter_tips($tips, $long = FALSE, $extra = '') {
   $output = '';
 
   $multiple = count($tips) > 1;
   if ($multiple) {
-    $output = t('Text formats') . ':';
+    $output = t('input formats') .':';
   }
 
   if (count($tips)) {
@@ -63,13 +42,13 @@ function theme_filter_tips($tips, $long = FALSE) {
     foreach ($tips as $name => $tiplist) {
       if ($multiple) {
         $output .= '<li>';
-        $output .= '<strong>' . $name . '</strong>:<br />';
+        $output .= '<strong>'. $name .'</strong>:<br />';
       }
 
       if (count($tiplist) > 0) {
         $output .= '<ul class="tips">';
         foreach ($tiplist as $tip) {
-          $output .= '<li' . ($long ? ' id="filter-' . str_replace("/", "-", $tip['id']) . '">' : '>') . $tip['tip'] . '</li>';
+          $output .= '<li'. ($long ? ' id="filter-'. str_replace("/", "-", $tip['id']) .'">' : '>') . $tip['tip'] .'</li>';
         }
         $output .= '</ul>';
       }

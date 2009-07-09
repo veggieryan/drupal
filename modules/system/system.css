@@ -1,4 +1,4 @@
-/* $Id: system.css,v 1.54 2009/04/11 22:19:45 webchick Exp $ */
+/* $Id: system.css,v 1.48 2008/01/09 09:56:39 goba Exp $ */
 
 /*
 ** HTML elements
@@ -77,7 +77,7 @@ div.error, tr.error {
 div.warning {
   border: 1px solid #f0c020;
 }
-div.warning, table tr.warning {
+div.warning, tr.warning {
   background: #ffd;
   color: #220;
   padding: 2px;
@@ -153,19 +153,12 @@ tr.merge-up, tr.merge-up td, tr.merge-up th {
 .marker, .form-required {
   color: #f00;
 }
-.more-help-link {
-  text-align: right; /* LTR */
-}
-.more-help-link a {
-  padding: 1px 0 1px 20px; /* LTR */
-  background: url(../../misc/help.png) 0 50% no-repeat; /* LTR */
-}
 .more-link {
   text-align: right; /* LTR */
 }
-.module-help {
-  margin-left: 1em; /* LTR */
-  float: right; /* LTR */
+.more-help-link {
+  font-size: 0.85em;
+  text-align: right; /* LTR */
 }
 .nowrap {
   white-space: nowrap;
@@ -320,18 +313,10 @@ html.js fieldset.collapsed * {
 }
 html.js fieldset.collapsed legend {
   display: block;
-  overflow: hidden;
 }
 html.js fieldset.collapsible legend a {
-  display: inline;
   padding-left: 15px; /* LTR */
   background: url(../../misc/menu-expanded.png) 5px 75% no-repeat; /* LTR */
-}
-html.js fieldset.collapsible legend span.summary {
-  display: inline;
-  font-size: 0.9em;
-  color: #999;
-  margin-left: 0.5em;
 }
 html.js fieldset.collapsed legend a {
   background-image: url(../../misc/menu-collapsed.png); /* LTR */
@@ -346,6 +331,9 @@ html.js fieldset.collapsed legend a {
 /* For Safari 2 to prevent collapsible fieldsets containing tables from dissapearing due to tableheader.js. */
 html.js fieldset.collapsible {
   position: relative;
+}
+html.js fieldset.collapsible legend a {
+  display: block;
 }
 /* Avoid jumping around due to margins collapsing into collapsible fieldset border */
 html.js fieldset.collapsible .fieldset-wrapper {
@@ -521,46 +509,36 @@ html.js .js-hide {
 /*
 ** Password strength indicator
 */
-.password-strength-title {
-  float: left; /* LTR */
+span.password-strength {
+  visibility: hidden;
 }
-#password-indicator {
-  border: 1px solid #B4B4B4;
-  float: right;
-  height: 0.9em;
-  margin: 0.3em 0.80em 0 0.3em;
-  width: 5em;
+input.password-field {
+  margin-right: 10px; /* LTR */
 }
-#password-indicator div {
-  height: 100%;
-  width: 0%;
-  background-color: #47C965;
+div.password-description {
+  padding: 0 2px;
+  margin: 4px 0 0 0;
+  font-size: 0.85em;
+  max-width: 500px;
 }
-input.password-confirm, input.password-field {
-  width: 16em;
-  margin-bottom: 0.4em;
-}
-div.password-suggestions {
-  padding: 0.2em 0.5em;
-  margin: 0.7em 0;
-  width: 38.5em;
-  border: 1px solid #B4B4B4;
-}
-div.password-suggestions ul {
+div.password-description ul {
   margin-bottom: 0;
 }
 .password-parent {
-  margin: 0;
-  float: left; /* LTR */
-  width: 17.3em;
+  margin: 0 0 0 0;
 }
-
 /*
 ** Password confirmation checker
 */
-.confirm-parent {
-  margin: 0;
+input.password-confirm {
+  margin-right: 10px; /* LTR */
 }
-div.password-confirm {
+.confirm-parent {
+  margin: 5px 0 0 0;
+}
+span.password-confirm {
   visibility: hidden;
+}
+span.password-confirm span {
+  font-weight: normal;
 }

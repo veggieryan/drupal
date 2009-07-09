@@ -1,13 +1,8 @@
 <?php
-// $Id: profile.install,v 1.20 2009/06/01 22:07:09 dries Exp $
+// $Id: profile.install,v 1.12.2.1 2009/01/06 15:46:37 goba Exp $
 
 /**
- * @file
- * Install, update and uninstall functions for the profile module.
- */
-
-/**
- * Implement hook_install().
+ * Implementation of hook_install().
  */
 function profile_install() {
   // Create tables.
@@ -15,7 +10,7 @@ function profile_install() {
 }
 
 /**
- * Implement hook_uninstall().
+ * Implementation of hook_uninstall().
  */
 function profile_uninstall() {
   // Remove tables
@@ -25,10 +20,10 @@ function profile_uninstall() {
 }
 
 /**
- * Implement hook_schema().
+ * Implementation of hook_schema().
  */
 function profile_schema() {
-  $schema['profile_field'] = array(
+  $schema['profile_fields'] = array(
     'description' => 'Stores profile field information.',
     'fields' => array(
       'fid' => array(
@@ -113,16 +108,12 @@ function profile_schema() {
         'description' => 'List of options to be used in a list selection field.',
       ),
     ),
-    'indexes' => array(
-      'category' => array('category'),
-    ),
-    'unique keys' => array(
-      'name' => array('name'),
-    ),
+    'indexes' => array('category' => array('category')),
+    'unique keys' => array('name' => array('name')),
     'primary key' => array('fid'),
   );
 
-  $schema['profile_value'] = array(
+  $schema['profile_values'] = array(
     'description' => 'Stores values for profile fields.',
     'fields' => array(
       'fid' => array(
@@ -130,7 +121,7 @@ function profile_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {profile_field}.fid of the field.',
+        'description' => 'The {profile_fields}.fid of the field.',
       ),
       'uid' => array(
         'type' => 'int',
@@ -149,21 +140,8 @@ function profile_schema() {
     'indexes' => array(
       'fid' => array('fid'),
     ),
-    'foreign keys' => array(
-      'fid' => array('profile_field' => 'fid'),
-      'uid' => array('users' => 'uid'),
-    ),
   );
 
   return $schema;
 }
 
-/**
- * Rename {profile_fields} table to {profile_field} and {profile_values} to {profile_value}.
- */
-function profile_update_7001() {
-  $ret = array();
-  db_rename_table($ret, 'profile_fields', 'profile_field');
-  db_rename_table($ret, 'profile_values', 'profile_value');
-  return $ret;
-}

@@ -1,4 +1,13 @@
-/* $Id: style.css,v 1.58 2009/06/20 07:40:36 webchick Exp $ */
+/* $Id: style.css,v 1.38.2.2 2009/04/27 14:20:53 goba Exp $ */
+
+/**
+ * Garland, for Drupal 6.x
+ * Stefan Nagtegaal, iStyledThis [dot] nl
+ * Steven Wittens, acko [dot] net`
+ *
+ * If you use a customized color scheme, you must regenerate it after
+ * modifying this file.
+ */
 
 /**
  * Generic elements
@@ -7,17 +16,17 @@ body {
   margin: 0;
   padding: 0;
   background: #edf5fa;
-  font: 76%/170% Verdana, sans-serif;
+  font: 12px/170% Verdana, sans-serif;
   color: #494949;
 }
 
 input {
-  font: 1em/100% Verdana, sans-serif;
+  font: 12px/100% Verdana, sans-serif;
   color: #494949;
 }
 
 textarea, select {
-  font: 1em/160% Verdana, sans-serif;
+  font: 12px/160% Verdana, sans-serif;
   color: #494949;
 }
 
@@ -53,7 +62,7 @@ h6 {
   font-size: 110%;
 }
 
-quote, code, fieldset {
+ul, quote, code, fieldset {
   margin: .5em 0;
 }
 
@@ -84,36 +93,51 @@ hr {
   background: #5294c1;
 }
 
-ul, .block ul, ol {
+ul {
   margin: 0.5em 0 1em;
-  padding: 0 0 0 1.5em; /* LTR */
+  padding: 0;
 }
 
-/* Default to menu leaf bullet for unordered list items. "ul" used here so it can cascade to list items and "li.leaf" to override the system leaf image. */
-ul, li.leaf {
-  list-style-image: url(images/menu-leaf.gif);
-}
-
-/* This is used to cancel the list style image when an ordered list is embedded in an unordered list. */
 ol {
-  list-style-image: none;
+  margin: 0.75em 0 1.25em;
+  padding: 0;
+}
+
+ol li, ul li {
+  margin: 0.4em 0 0.4em .5em; /* LTR */
 }
 
 ul.menu, .item-list ul {
   margin: 0.35em 0 0 -0.5em; /* LTR */
+  padding: 0;
+}
+
+ul.menu ul, .item-list ul ul {
+  margin-left: 0em; /* LTR */
 }
 
 ol li, ul li, ul.menu li, .item-list ul li, li.leaf {
   margin: 0.15em 0 0.15em .5em; /* LTR */
-  padding-bottom: .1em;
+}
+
+ul li, ul.menu li, .item-list ul li, li.leaf {
+  padding: 0 0 .2em 1.5em;
+  list-style-type: none;
+  list-style-image: none;
+  background: transparent url(images/menu-leaf.gif) no-repeat 1px .35em; /* LTR */
+}
+
+ol li {
+  padding: 0 0 .3em;
+  margin-left: 2em; /* LTR */
 }
 
 ul li.expanded {
-  list-style-image: url(images/menu-expanded.gif);
+  background: transparent url(images/menu-expanded.gif) no-repeat 1px .35em; /* LTR */
 }
 
 ul li.collapsed {
-  list-style-image: url(images/menu-collapsed.gif); /* LTR */
+  background: transparent url(images/menu-collapsed.gif) no-repeat 0px .35em; /* LTR */
 }
 
 ul li.leaf a, ul li.expanded a, ul li.collapsed a {
@@ -145,7 +169,7 @@ ol.task-list li.active {
   margin-right: 1em; /* LTR */
 }
 
-fieldset ul.clearfix li {
+fieldset ul.clear-block li {
   margin: 0;
   padding: 0;
   background-image: none;
@@ -199,7 +223,7 @@ tr.even {
 }
 
 tr.drag {
-  background-color: #ffb;
+  background-color: #fffff0;
 }
 
 tr.drag-previous {
@@ -230,13 +254,9 @@ span.form-required {
   color: #ffae00;
 }
 
-span.submitted, .description, .vertical-tab-button .summary {
+span.submitted, .description {
   font-size: 0.92em;
   color: #898989;
-}
-
-.description .more-help-link {
-  font-size: 0.92em;
 }
 
 .description {
@@ -245,23 +265,13 @@ span.submitted, .description, .vertical-tab-button .summary {
   color: #898989;
 }
 
-.preview {
+.messages, .preview {
   margin: .75em 0 .75em;
   padding: .5em 1em;
 }
 
-.messages {
-  margin: .75em 0 .75em;
-  padding: .1em .5em .15em;
-}
-
 .messages ul {
   margin: 0;
-}
-
-.messages li {
-  margin: 0;
-  padding: 0 0 0 1.3em; /* LTR */
 }
 
 .form-checkboxes, .form-radios, .form-checkboxes .form-item, .form-radios .form-item {
@@ -373,7 +383,7 @@ table .form-button, table .form-submit {
 }
 
 /* With 3 columns, require a minimum width of 1000px to ensure there is enough horizontal space. */
-body.two-sidebars {
+body.sidebars {
   min-width: 980px;
 }
 /* With 2 columns, require a minimum width of 800px. */
@@ -394,7 +404,7 @@ body.sidebar-left #center {
 body.sidebar-right #center {
   margin-right: -210px;
 }
-body.two-sidebars #center {
+body.sidebars #center {
   margin: 0 -210px;
 }
 
@@ -405,7 +415,7 @@ body.sidebar-left #squeeze {
 body.sidebar-right #squeeze {
   margin-right: 210px;
 }
-body.two-sidebars #squeeze {
+body.sidebars #squeeze {
   margin: 0 210px;
 }
 
@@ -494,7 +504,7 @@ body.sidebar-right #footer {
   margin-right: -210px;
 }
 
-body.two-sidebars #footer {
+body.sidebars #footer {
   margin: 0 -210px;
 }
 
@@ -520,7 +530,7 @@ body.two-sidebars #footer {
   color: #529ad6;
 }
 
-#highlight {
+#mission {
   padding: 1em;
   background-color: #fff;
   border: 1px solid #e0e5fb;
@@ -530,7 +540,7 @@ body.two-sidebars #footer {
 /**
  * Primary navigation
  */
-ul.main-menu {
+ul.primary-links {
   margin: 0;
   padding: 0;
   float: right; /* LTR */
@@ -538,14 +548,14 @@ ul.main-menu {
   z-index: 4;
 }
 
-ul.main-menu li {
+ul.primary-links li {
   margin: 0;
   padding: 0;
   float: left; /* LTR */
   background-image: none;
 }
 
-ul.main-menu li a, ul.main-menu li a:link, ul.main-menu li a:visited {
+ul.primary-links li a, ul.primary-links li a:link, ul.primary-links li a:visited {
   display: block;
   margin: 0 1em;
   padding: .75em 0 0;
@@ -553,7 +563,7 @@ ul.main-menu li a, ul.main-menu li a:link, ul.main-menu li a:visited {
   background: transparent url(images/bg-navigation-item.png) no-repeat 50% 0;
 }
 
-ul.main-menu li a:hover, ul.main-menu li a.active {
+ul.primary-links li a:hover, ul.primary-links li a.active {
   color: #fff;
   background: transparent url(images/bg-navigation-item-hover.png) no-repeat 50% 0;
 }
@@ -561,7 +571,7 @@ ul.main-menu li a:hover, ul.main-menu li a.active {
 /**
  * Secondary navigation
  */
-ul.secondary-menu {
+ul.secondary-links {
   margin: 0;
   padding: 18px 0 0;
   float: right; /* LTR */
@@ -570,14 +580,14 @@ ul.secondary-menu {
   z-index: 4;
 }
 
-ul.secondary-menu li {
+ul.secondary-links li {
   margin: 0;
   padding: 0;
   float: left; /* LTR */
   background-image: none;
 }
 
-ul.secondary-menu li a, ul.secondary-menu li a:link, ul.secondary-menu li a:visited {
+ul.secondary-links li a, ul.secondary-links li a:link, ul.secondary-links li a:visited {
   display: block;
   margin: 0 1em;
   padding: .75em 0 0;
@@ -585,7 +595,7 @@ ul.secondary-menu li a, ul.secondary-menu li a:link, ul.secondary-menu li a:visi
   background: transparent;
 }
 
-ul.secondary-menu li a:hover, ul.secondary-menu li a.active {
+ul.secondary-links li a:hover, ul.secondary-links li a.active {
   color: #cde3f1;
   background: transparent;
 }
@@ -690,14 +700,14 @@ ul.links li, ul.inline li {
   float: right; /* LTR */
 }
 
-.preview .node, .preview .comment, .node-sticky {
+.preview .node, .preview .comment, .sticky {
   margin: 0;
   padding: 0.5em 0;
   border: 0;
   background: 0;
 }
 
-.node-sticky {
+.sticky {
   padding: 1em;
   background-color: #fff;
   border: 1px solid #e0e5fb;
@@ -708,7 +718,7 @@ ul.links li, ul.inline li {
   position: relative;
   top: -1px;
   border-bottom: 1px solid #e9eff3;
-  margin: 1.5em -25px 0;
+  margin: -1.5em -25px 0;
   padding: 0 25px;
 }
 
@@ -773,6 +783,9 @@ ul.links li, ul.inline li {
 /**
  * Menu.module
  */
+tr.menu-disabled {
+  opacity: 0.5;
+}
 tr.odd td.menu-disabled {
   background-color: #edf5fa;
 }
@@ -822,16 +835,6 @@ fieldset {
   background-position: 0 .75em;
   background-color: transparent;
 }
-*:first-child+html .text-format-wrapper .filter-wrapper {
-  padding: 1.5em 0 1.5em;
-  background-position: 0 0;
-}
-
-/* Keep the background position at 0 for filters and vertical tabs. */
-*:first-child+html fieldset.filter-wrapper,
-*:first-child+html fieldset.vertical-tabs-pane {
-  background-position: 0 0;
-}
 
 *:first-child+html fieldset > .description, *:first-child+html fieldset .fieldset-wrapper .description {
   padding-top: 1em;
@@ -857,73 +860,24 @@ html.js fieldset.collapsible legend a {
   background: url(images/menu-expanded.gif) no-repeat 0% 50%; /* LTR */
 }
 
-html.js fieldset.collapsible legend span.summary {
-  color: #898989;
-}
-
 html.js fieldset.collapsed legend a {
   background: url(images/menu-collapsed.gif) no-repeat 0% 50%; /* LTR */
 }
 
 /**
- * Vertical tabs.
- */
-div.vertical-tabs {
-  margin-right: 5%;
-  border-color: #d9eaf5;
-}
-
-div.vertical-tabs .vertical-tabs-panes fieldset.vertical-tabs-pane {
-  padding: 0.5em 1em;
-}
-
-div.vertical-tabs ul.vertical-tabs-list {
-  border-color: #d9eaf5;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li {
-  background-color: #edf5fa;
-  border-color: #d9eaf5;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li strong {
-  font-weight: normal;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li.selected strong {
-  font-weight: bold;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li.selected small {
-  color: #898989;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li.selected {
-  background: #fff repeat-x 0 0;
-}
-
-div.vertical-tabs ul.vertical-tabs-list li.selected.first {
-  background-image: url(images/gradient-inner.png);
-}
-
-div.vertical-tabs ul.vertical-tabs-list li.selected a strong {
-  color: #494949;
-}
-
-/**
  * Syndication icons and block
  */
-#block-node-syndicate h2 {
+#block-node-0 h2 {
   float: left; /* LTR */
   padding-right: 20px; /* LTR */
 }
 
-#block-node-syndicate img, .feed-icon {
+#block-node-0 img, .feed-icon {
   float: right; /* LTR */
   padding-top: 4px;
 }
 
-#block-node-syndicate .content {
+#block-node-0 .content {
   clear: right; /* LTR */
 }
 

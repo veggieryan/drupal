@@ -1,5 +1,5 @@
 <?php
-// $Id: comment.module,v 1.739 2009/07/07 13:53:25 dries Exp $
+// $Id: comment.module,v 1.617.2.8 2009/07/01 20:51:55 goba Exp $
 
 /**
  * @file
@@ -11,27 +11,67 @@
  */
 
 /**
- * Comment is awaiting approval.
- */
-define('COMMENT_NOT_PUBLISHED', 0);
-
-/**
  * Comment is published.
  */
-define('COMMENT_PUBLISHED', 1);
+define('COMMENT_PUBLISHED', 0);
+
+/**
+ * Comment is awaiting approval.
+ */
+define('COMMENT_NOT_PUBLISHED', 1);
+
+/**
+ * Comments are displayed in a flat list - collapsed.
+ */
+define('COMMENT_MODE_FLAT_COLLAPSED', 1);
 
 /**
  * Comments are displayed in a flat list - expanded.
  */
-define('COMMENT_MODE_FLAT', 0);
+define('COMMENT_MODE_FLAT_EXPANDED', 2);
+
+/**
+ * Comments are displayed as a threaded list - collapsed.
+ */
+define('COMMENT_MODE_THREADED_COLLAPSED', 3);
 
 /**
  * Comments are displayed as a threaded list - expanded.
  */
-define('COMMENT_MODE_THREADED', 1);
+define('COMMENT_MODE_THREADED_EXPANDED', 4);
 
 /**
- * Anonymous posters cannot enter their contact information.
+ * Comments are ordered by date - newest first.
+ */
+define('COMMENT_ORDER_NEWEST_FIRST', 1);
+
+/**
+ * Comments are ordered by date - oldest first.
+ */
+define('COMMENT_ORDER_OLDEST_FIRST', 2);
+
+/**
+ * Comment controls should be shown above the comment list.
+ */
+define('COMMENT_CONTROLS_ABOVE', 0);
+
+/**
+ * Comment controls should be shown below the comment list.
+ */
+define('COMMENT_CONTROLS_BELOW', 1);
+
+/**
+ * Comment controls should be shown both above and below the comment list.
+ */
+define('COMMENT_CONTROLS_ABOVE_BELOW', 2);
+
+/**
+ * Comment controls are hidden.
+ */
+define('COMMENT_CONTROLS_HIDDEN', 3);
+
+/**
+ * Anonymous posters may not enter their contact information.
  */
 define('COMMENT_ANONYMOUS_MAYNOT_CONTACT', 0);
 
@@ -41,7 +81,7 @@ define('COMMENT_ANONYMOUS_MAYNOT_CONTACT', 0);
 define('COMMENT_ANONYMOUS_MAY_CONTACT', 1);
 
 /**
- * Anonymous posters are required to leave their contact information.
+ * Anonymous posters must leave their contact information.
  */
 define('COMMENT_ANONYMOUS_MUST_CONTACT', 2);
 
@@ -56,19 +96,19 @@ define('COMMENT_FORM_SEPARATE_PAGE', 0);
 define('COMMENT_FORM_BELOW', 1);
 
 /**
- * Comments for this node are hidden.
+ * Comments for this node are disabled.
  */
-define('COMMENT_NODE_HIDDEN', 0);
+define('COMMENT_NODE_DISABLED', 0);
 
 /**
- * Comments for this node are closed.
+ * Comments for this node are locked.
  */
-define('COMMENT_NODE_CLOSED', 1);
+define('COMMENT_NODE_READ_ONLY', 1);
 
 /**
- * Comments for this node are open.
+ * Comments are enabled on this node.
  */
-define('COMMENT_NODE_OPEN', 2);
+define('COMMENT_NODE_READ_WRITE', 2);
 
 /**
  * Comment preview is optional.
@@ -81,27 +121,32 @@ define('COMMENT_PREVIEW_OPTIONAL', 0);
 define('COMMENT_PREVIEW_REQUIRED', 1);
 
 /**
- * Implement hook_help().
+ * Implementation of hook_help().
  */
 function comment_help($path, $arg) {
   switch ($path) {
     case 'admin/help#comment':
-      $output  = '<p>' . t('The comment module allows visitors to comment on your posts, creating ad hoc discussion boards. Any <a href="@content-type">content type</a> may have its <em>Default comment setting</em> set to <em>Open</em> to allow comments, <em>Hidden</em> to hide existing comments and prevent new comments or <em>Closed</em> to allow existing comments to be viewed but no new comments added. Comment display settings and other controls may also be customized for each content type.', array('@content-type' => url('admin/build/types'))) . '</p>';
-      $output .= '<p>' . t('Comment permissions are assigned to user roles, and are used to determine whether anonymous users (or other roles) are allowed to comment on posts. If anonymous users are allowed to comment, their individual contact information may be retained in cookies stored on their local computer for use in later comment submissions. When a comment has no replies, it may be (optionally) edited by its author. The comment module uses the same text formats and HTML tags available when creating other forms of content.') . '</p>';
-      $output .= '<p>' . t('Change comment settings on the content type\'s <a href="@content-type">edit page</a>.', array('@content-type' => url('admin/build/types'))) . '</p>';
-      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@comment">Comment module</a>.', array('@comment' => 'http://drupal.org/handbook/modules/comment/')) . '</p>';
-
+      $output = '<p>'. t('The comment module allows visitors to comment on your posts, creating ad hoc discussion boards. Any <a href="@content-type">content type</a> may have its <em>Default comment setting</em> set to <em>Read/Write</em> to allow comments, or <em>Disabled</em>, to prevent comments. Comment display settings and other controls may also be customized for each content type (some display settings are customizable by individual users).', array('@content-type' => url('admin/content/types'))) .'</p>';
+      $output .= '<p>'. t('Comment permissions are assigned to user roles, and are used to determine whether anonymous users (or other roles) are allowed to comment on posts. If anonymous users are allowed to comment, their individual contact information may be retained in cookies stored on their local computer for use in later comment submissions. When a comment has no replies, it may be (optionally) edited by its author. The comment module uses the same input formats and HTML tags available when creating other forms of content.') .'</p>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@comment">Comment module</a>.', array('@comment' => 'http://drupal.org/handbook/modules/comment/')) .'</p>';
       return $output;
+    case 'admin/content/comment':
+      return '<p>'. t("Below is a list of the latest comments posted to your site. Click on a subject to see the comment, the author's name to edit the author's user information, 'edit' to modify the text, and 'delete' to remove their submission.") .'</p>';
+    case 'admin/content/comment/approval':
+      return '<p>'. t("Below is a list of the comments posted to your site that need approval. To approve a comment, click on 'edit' and then change its 'moderation status' to Approved. Click on a subject to see the comment, the author's name to edit the author's user information, 'edit' to modify the text, and 'delete' to remove their submission.") .'</p>';
   }
 }
 
 /**
- * Implement hook_theme().
+ * Implementation of hook_theme().
  */
 function comment_theme() {
   return array(
     'comment_block' => array(
       'arguments' => array(),
+    ),
+    'comment_admin_overview' => array(
+      'arguments' => array('form' => NULL),
     ),
     'comment_preview' => array(
       'arguments' => array('comment' => NULL, 'node' => NULL, 'links' => array(), 'visible' => 1),
@@ -109,18 +154,24 @@ function comment_theme() {
     'comment_view' => array(
       'arguments' => array('comment' => NULL, 'node' => NULL, 'links' => array(), 'visible' => 1),
     ),
+    'comment_controls' => array(
+      'arguments' => array('form' => NULL),
+    ),
     'comment' => array(
       'template' => 'comment',
       'arguments' => array('comment' => NULL, 'node' => NULL, 'links' => array()),
     ),
-    'comment_form_box' => array(
-      'arguments' => array('edit' => NULL, 'title' => NULL),
-    ),
     'comment_folded' => array(
       'template' => 'comment-folded',
+      'arguments' => array('comment' => NULL),
+    ),
+    'comment_flat_collapsed' => array(
       'arguments' => array('comment' => NULL, 'node' => NULL),
     ),
     'comment_flat_expanded' => array(
+      'arguments' => array('comment' => NULL, 'node' => NULL),
+    ),
+    'comment_thread_collapsed' => array(
       'arguments' => array('comment' => NULL, 'node' => NULL),
     ),
     'comment_thread_expanded' => array(
@@ -140,205 +191,116 @@ function comment_theme() {
 }
 
 /**
- * Implement hook_menu().
+ * Implementation of hook_menu().
  */
 function comment_menu() {
-  $items['admin/content/content/comment'] = array(
+  $items['admin/content/comment'] = array(
     'title' => 'Comments',
-    'description' => 'List and edit site comments and the comment approval queue.',
+    'description' => 'List and edit site comments and the comment moderation queue.',
     'page callback' => 'comment_admin',
     'access arguments' => array('administer comments'),
-    'type' => MENU_LOCAL_TASK,
+    'file' => 'comment.admin.inc',
   );
-  // Tabs begin here.
-  $items['admin/content/content/comment/new'] = array(
+
+  // Tabs:
+  $items['admin/content/comment/new'] = array(
     'title' => 'Published comments',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-  $items['admin/content/content/comment/approval'] = array(
+  $items['admin/content/comment/approval'] = array(
     'title' => 'Approval queue',
     'page arguments' => array('approval'),
     'access arguments' => array('administer comments'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'comment.admin.inc',
   );
+
   $items['comment/delete'] = array(
     'title' => 'Delete comment',
     'page callback' => 'comment_delete',
     'access arguments' => array('administer comments'),
     'type' => MENU_CALLBACK,
+    'file' => 'comment.admin.inc',
   );
+
   $items['comment/edit'] = array(
     'title' => 'Edit comment',
     'page callback' => 'comment_edit',
     'access arguments' => array('post comments'),
     'type' => MENU_CALLBACK,
+    'file' => 'comment.pages.inc',
   );
   $items['comment/reply/%node'] = array(
-    'title' => 'Add new comment',
+    'title' => 'Reply to comment',
     'page callback' => 'comment_reply',
     'page arguments' => array(2),
     'access callback' => 'node_access',
     'access arguments' => array('view', 2),
     'type' => MENU_CALLBACK,
-  );
-  $items['comment/approve'] = array(
-    'title' => 'Approve a comment',
-    'page callback' => 'comment_approve',
-    'page arguments' => array(2),
-    'access arguments' => array('administer comments'),
-    'type' => MENU_CALLBACK,
-  );
-  $items['comment/%comment'] = array(
-    'title' => 'Comment permalink',
-    'page callback' => 'comment_permalink',
-    'page arguments' => array(1),
-    'access arguments' => array('access comments'),
-    'type' => MENU_CALLBACK,
+    'file' => 'comment.pages.inc',
   );
 
   return $items;
 }
 
 /**
- * Implement hook_node_type().
+ * Implementation of hook_node_type().
  */
 function comment_node_type($op, $info) {
   $settings = array(
     'comment',
     'comment_default_mode',
+    'comment_default_order',
     'comment_default_per_page',
+    'comment_controls',
     'comment_anonymous',
     'comment_subject_field',
     'comment_preview',
     'comment_form_location',
   );
-
   switch ($op) {
     case 'delete':
       foreach ($settings as $setting) {
-        variable_del($setting . '_' . $info->type);
+        variable_del($setting .'_'. $info->type);
       }
       break;
   }
 }
 
 /**
- * Implement hook_permission().
+ * Implementation of hook_perm().
  */
-function comment_permission() {
-  return array(
-    'administer comments' => array(
-      'title' => t('Administer comments'),
-      'description' => t('Manage and approve comments, and configure comment administration settings.'),
-    ),
-    'access comments' => array(
-      'title' => t('Access comments'),
-      'description' => t('View comments attached to content.'),
-    ),
-    'post comments' => array(
-      'title' => t('Post comments'),
-      'description' => t('Add comments to content (approval required).'),
-    ),
-    'post comments without approval' => array(
-      'title' => t('Post comments without approval'),
-      'description' => t('Add comments to content (no approval required).'),
-    ),
-  );
+function comment_perm() {
+  return array('access comments', 'post comments', 'administer comments', 'post comments without approval');
 }
 
 /**
- * Implement hook_block_list().
- */
-function comment_block_list() {
-  $blocks['recent']['info'] = t('Recent comments');
-
-  return $blocks;
-}
-
-/**
- * Implement hook_block_configure().
- */
-function comment_block_configure($delta = '') {
-  $form['comment_block_count'] = array(
-    '#type' => 'select',
-    '#title' => t('Number of recent comments'),
-    '#default_value' => variable_get('comment_block_count', 10),
-    '#options' => drupal_map_assoc(array(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 30)),
-  );
-
-  return $form;
-}
-
-/**
- * Implement hook_block_save().
- */
-function comment_block_save($delta = '', $edit = array()) {
-  variable_set('comment_block_count', (int)$edit['comment_block_count']);
-}
-
-/**
- * Implement hook_block_view().
+ * Implementation of hook_block().
  *
  * Generates a block with the most recent comments.
  */
-function comment_block_view($delta = '') {
-  if (user_access('access comments')) {
+function comment_block($op = 'list', $delta = 0) {
+  if ($op == 'list') {
+    $blocks[0]['info'] = t('Recent comments');
+    return $blocks;
+  }
+  else if ($op == 'view' && user_access('access comments')) {
     $block['subject'] = t('Recent comments');
     $block['content'] = theme('comment_block');
-
     return $block;
   }
 }
 
 /**
- * Redirects comment links to the correct page depending on comment settings.
- *
- * Since comments are paged there is no way to guarantee which page a comment
- * appears on. Comment paging and threading settings may be changed at any time.
- * With threaded comments, an individual comment may move between pages as
- * comments can be added either before or after it in the overall discussion.
- * Therefore we use a central routing function for comment links, which
- * calculates the page number based on current comment settings and returns
- * the full comment view with the pager set dynamically.
- *
- * @param $comment
- *   A comment object.
- * @return
- *   The comment listing set to the page on which the comment appears.
- */
-function comment_permalink($comment) {
-  $node = node_load($comment->nid);
-  if ($node && $comment) {
-
-    // Find the current display page for this comment.
-    $page = comment_get_display_page($comment->cid, $node->type);
-
-    // Set $_GET['q'] and $_GET['page'] ourselves so that the node callback
-    // behaves as it would when visiting the page directly.
-    $_GET['q'] = 'node/' . $node->nid;
-    $_GET['page'] = $page;
-
-    // Set the node path as the canonical URL to prevent duplicate content.
-    drupal_add_link(array('rel' => 'canonical', 'href' => url('node/' . $node->nid)));
-
-    // Return the node view, this will show the correct comment in context.
-    return menu_execute_active_handler('node/' . $node->nid);
-  }
-  drupal_not_found();
-}
-
-/**
- * Find the most recent comments that are available to the current user.
- *
- * This is done in two steps:
- *   1. Query the {node_comment_statistics} table to find n number of nodes that
- *      have the most recent comments. This table is indexed on
- *      last_comment_timestamp, thus making it a fast query.
- *   2. Load the information from the comments table based on the nids found
+ * Find a number of recent comments. This is done in two steps.
+ *   1. Find the n (specified by $number) nodes that have the most recent
+ *      comments.  This is done by querying node_comment_statistics which has
+ *      an index on last_comment_timestamp, and is thus a fast query.
+ *   2. Loading the information from the comments table based on the nids found
  *      in step 1.
  *
- * @param integer $number
+ * @param $number
  *   (optional) The maximum number of comments to find.
  * @return
  *   An array of comment objects each containing a nid,
@@ -346,26 +308,24 @@ function comment_permalink($comment) {
  *   comments visible to the current user.
  */
 function comment_get_recent($number = 10) {
-  // Step 1: Select a $number of nodes which have new comments,
-  //         and are visible to the current user.
-  $nids = db_query_range("SELECT nc.nid FROM {node_comment_statistics} nc WHERE nc.comment_count > 0 ORDER BY nc.last_comment_timestamp DESC", 0, $number)->fetchCol();
+  // Select the $number nodes (visible to the current user) with the most
+  // recent comments. This is efficient due to the index on
+  // last_comment_timestamp.
+  $result = db_query_range(db_rewrite_sql("SELECT nc.nid FROM {node_comment_statistics} nc WHERE nc.comment_count > 0 ORDER BY nc.last_comment_timestamp DESC", 'nc'), 0, $number);
+
+  $nids = array();
+  while ($row = db_fetch_object($result)) {
+    $nids[] = $row->nid;
+  }
 
   $comments = array();
   if (!empty($nids)) {
-    // Step 2: From among the comments on the nodes selected in the first query,
-    //         find the $number of most recent comments.
-    // Using Query Builder here for the IN-Statement.
-    $query = db_select('comment', 'c');
-    $query->innerJoin('node', 'n', 'n.nid = c.nid');
-    return $query
-      ->fields('c', array('nid', 'subject', 'cid', 'timestamp'))
-      ->condition('c.nid', $nids, 'IN')
-      ->condition('c.status', COMMENT_PUBLISHED)
-      ->condition('n.status', 1)
-      ->orderBy('c.cid', 'DESC')
-      ->range(0, $number)
-      ->execute()
-      ->fetchAll();
+    // From among the comments on the nodes selected in the first query,
+    // find the $number most recent comments.
+    $result = db_query_range('SELECT c.nid, c.subject, c.cid, c.timestamp FROM {comments} c INNER JOIN {node} n ON n.nid = c.nid WHERE c.nid IN ('. implode(',', $nids) .') AND n.status = 1 AND c.status = %d ORDER BY c.cid DESC', COMMENT_PUBLISHED, 0, $number);
+    while ($comment = db_fetch_object($result)) {
+      $comments[] = $comment;
+    }
   }
 
   return $comments;
@@ -386,38 +346,40 @@ function comment_get_recent($number = 10) {
 function comment_new_page_count($num_comments, $new_replies, $node) {
   $comments_per_page = _comment_get_display_setting('comments_per_page', $node);
   $mode = _comment_get_display_setting('mode', $node);
+  $order = _comment_get_display_setting('sort', $node);
   $pagenum = NULL;
-  $flat = $mode == COMMENT_MODE_FLAT ? TRUE : FALSE;
-  if ($num_comments <= $comments_per_page) {
-    // Only one page of comments.
+  $flat = in_array($mode, array(COMMENT_MODE_FLAT_COLLAPSED, COMMENT_MODE_FLAT_EXPANDED));
+  if ($num_comments <= $comments_per_page || ($flat && $order == COMMENT_ORDER_NEWEST_FIRST)) {
+    // Only one page of comments or flat forum and newest first.
+    // First new comment will always be on first page.
     $pageno = 0;
   }
-  elseif ($flat) {
-    // Flat comments.
-    $count = $num_comments - $new_replies;
-    $pageno =  $count / $comments_per_page;
-  }
   else {
-    // Threaded comments.
-    // Find the first thread with a new comment.
-    $result = db_query_range('(SELECT thread
-      FROM {comment}
-      WHERE nid = :nid
-        AND status = 0
-      ORDER BY timestamp DESC)
-      ORDER BY SUBSTRING(thread, 1, (LENGTH(thread) - 1))', array(':nid' => $node->nid), 0, $new_replies)->fetchField();
-    $thread = substr($result, 0, -1);
-    $count = db_query('SELECT COUNT(*) FROM {comment} WHERE nid = :nid AND status = 0 AND SUBSTRING(thread, 1, (LENGTH(thread) - 1)) < :thread', array(
-      ':nid' => $node->nid,
-      ':thread' => $thread,
-    ))->fetchField();
+    if ($flat) {
+      // Flat comments and oldest first.
+      $count = $num_comments - $new_replies;
+    }
+    else {
+      // Threaded comments. See the documentation for comment_render().
+      if ($order == COMMENT_ORDER_NEWEST_FIRST) {
+        // Newest first: find the last thread with new comment
+        $result = db_query('(SELECT thread FROM {comments} WHERE nid = %d  AND status = 0 ORDER BY timestamp DESC LIMIT %d) ORDER BY thread DESC LIMIT 1', $node->nid, $new_replies);
+        $thread = db_result($result);
+        $result_count = db_query("SELECT COUNT(*) FROM {comments} WHERE nid = %d AND status = 0 AND thread > '". $thread ."'", $node->nid);
+      }
+      else {
+        // Oldest first: find the first thread with new comment
+        $result = db_query('(SELECT thread FROM {comments} WHERE nid = %d  AND status = 0 ORDER BY timestamp DESC LIMIT %d) ORDER BY SUBSTRING(thread, 1, (LENGTH(thread) - 1)) LIMIT 1', $node->nid, $new_replies);
+        $thread = substr(db_result($result), 0, -1);
+        $result_count = db_query("SELECT COUNT(*) FROM {comments} WHERE nid = %d AND status = 0 AND SUBSTRING(thread, 1, (LENGTH(thread) - 1)) < '". $thread ."'", $node->nid);
+      }
+      $count = db_result($result_count);
+    }
     $pageno =  $count / $comments_per_page;
   }
-
   if ($pageno >= 1) {
-    $pagenum = "page=" . intval($pageno);
+    $pagenum = "page=". intval($pageno);
   }
-
   return $pagenum;
 }
 
@@ -430,65 +392,56 @@ function comment_new_page_count($num_comments, $new_replies, $node) {
  */
 function theme_comment_block() {
   $items = array();
-  $number = variable_get('comment_block_count', 10);
-  foreach (comment_get_recent($number) as $comment) {
-    $items[] = l($comment->subject, 'comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid)) . '<br />' . t('@time ago', array('@time' => format_interval(REQUEST_TIME - $comment->timestamp)));
+  foreach (comment_get_recent() as $comment) {
+    $items[] = l($comment->subject, 'node/'. $comment->nid, array('fragment' => 'comment-'. $comment->cid)) .'<br />'. t('@time ago', array('@time' => format_interval(time() - $comment->timestamp)));
   }
-
   if ($items) {
     return theme('item_list', $items);
   }
 }
 
 /**
- * Implement hook_node_view().
+ * Implementation of hook_link().
  */
-function comment_node_view($node, $build_mode) {
+function comment_link($type, $node = NULL, $teaser = FALSE) {
   $links = array();
 
-  if ($node->comment) {
-    if ($build_mode == 'rss') {
-      if ($node->comment != COMMENT_NODE_HIDDEN) {
-        // Add a comments RSS element which is a URL to the comments of this node.
-        $node->rss_elements[] = array(
-          'key' => 'comments',
-          'value' => url('node/' . $node->nid, array('fragment' => 'comments', 'absolute' => TRUE))
-        );
-      }
-    }
-    elseif ($build_mode == 'teaser') {
+  if ($type == 'node' && $node->comment) {
+
+    if ($teaser) {
       // Main page: display the number of comments that have been posted.
+
       if (user_access('access comments')) {
-        if (!empty($node->comment_count)) {
+        $all = comment_num_all($node->nid);
+
+        if ($all) {
           $links['comment_comments'] = array(
-            'title' => format_plural($node->comment_count, '1 comment', '@count comments'),
+            'title' => format_plural($all, '1 comment', '@count comments'),
             'href' => "node/$node->nid",
             'attributes' => array('title' => t('Jump to the first comment of this posting.')),
-            'fragment' => 'comments',
-            'html' => TRUE,
+            'fragment' => 'comments'
           );
 
           $new = comment_num_new($node->nid);
+
           if ($new) {
             $links['comment_new_comments'] = array(
               'title' => format_plural($new, '1 new comment', '@count new comments'),
               'href' => "node/$node->nid",
-              'query' => comment_new_page_count($node->comment_count, $new, $node),
+              'query' => comment_new_page_count($all, $new, $node),
               'attributes' => array('title' => t('Jump to the first new comment of this posting.')),
-              'fragment' => 'new',
-              'html' => TRUE,
+              'fragment' => 'new'
             );
           }
         }
         else {
-          if ($node->comment == COMMENT_NODE_OPEN) {
+          if ($node->comment == COMMENT_NODE_READ_WRITE) {
             if (user_access('post comments')) {
               $links['comment_add'] = array(
                 'title' => t('Add new comment'),
                 'href' => "comment/reply/$node->nid",
                 'attributes' => array('title' => t('Add a new comment to this page.')),
-                'fragment' => 'comment-form',
-                'html' => TRUE,
+                'fragment' => 'comment-form'
               );
             }
             else {
@@ -499,21 +452,18 @@ function comment_node_view($node, $build_mode) {
       }
     }
     else {
-      // Node page: add a "post comment" link if the user is allowed to post
-      // comments and if this node is not read-only.
-      if ($node->comment == COMMENT_NODE_OPEN) {
+      // Node page: add a "post comment" link if the user is allowed to
+      // post comments, if this node is not read-only, and if the comment form isn't already shown
+
+      if ($node->comment == COMMENT_NODE_READ_WRITE) {
         if (user_access('post comments')) {
-          $links['comment_add'] = array(
-            'title' => t('Add new comment'),
-            'attributes' => array('title' => t('Share your thoughts and opinions related to this posting.')),
-            'fragment' => 'comment-form',
-            'html' => TRUE,
-          );
-          if (variable_get('comment_form_location_' . $node->type, COMMENT_FORM_BELOW) == COMMENT_FORM_SEPARATE_PAGE) {
-            $links['comment_add']['href'] = "comment/reply/$node->nid";
-          }
-          else {
-            $links['comment_add']['href'] = "node/$node->nid";
+          if (variable_get('comment_form_location_'. $node->type, COMMENT_FORM_SEPARATE_PAGE) == COMMENT_FORM_SEPARATE_PAGE) {
+            $links['comment_add'] = array(
+              'title' => t('Add new comment'),
+              'href' => "comment/reply/$node->nid",
+              'attributes' => array('title' => t('Share your thoughts and opinions related to this posting.')),
+              'fragment' => 'comment-form'
+            );
           }
         }
         else {
@@ -521,294 +471,176 @@ function comment_node_view($node, $build_mode) {
         }
       }
     }
-
-    if (isset($links['comment_forbidden'])) {
-      $links['comment_forbidden']['html'] = TRUE;
-    }
-
-    $node->content['links']['comment'] = array(
-      '#theme' => 'links',
-      '#links' => $links,
-      '#attributes' => array('class' => 'links inline'),
-    );
-
-    // Append the list of comments to $node->content for node detail pages.
-    if ($node->comment && (bool)menu_get_object() && empty($node->in_preview)) {
-      $node->content['comments'] = array(
-        '#markup' => comment_render($node),
-        '#sorted' => TRUE,
-      );
-    }
   }
+
+  if ($type == 'comment') {
+    $links = comment_links($node, $teaser);
+  }
+  if (isset($links['comment_forbidden'])) {
+    $links['comment_forbidden']['html'] = TRUE;
+  }
+
+  return $links;
 }
 
 /**
- * Implement hook_form_FORM_ID_alter().
+ * Implementation of hook_form_alter().
  */
-function comment_form_node_type_form_alter(&$form, $form_state) {
-  if (isset($form['identity']['type'])) {
+function comment_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
     $form['comment'] = array(
       '#type' => 'fieldset',
       '#title' => t('Comment settings'),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
+    $form['comment']['comment'] = array(
+      '#type' => 'radios',
+      '#title' => t('Default comment setting'),
+      '#default_value' => variable_get('comment_'. $form['#node_type']->type, COMMENT_NODE_READ_WRITE),
+      '#options' => array(t('Disabled'), t('Read only'), t('Read/Write')),
+      '#description' => t('Users with the <em>administer comments</em> permission will be able to override this setting.'),
+    );
     $form['comment']['comment_default_mode'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Threading'),
-      '#default_value' => variable_get('comment_default_mode_' . $form['#node_type']->type, COMMENT_MODE_THREADED),
-      '#description' => t('Show comment replies in a threaded list.'),
+      '#type' => 'radios',
+      '#title' => t('Default display mode'),
+      '#default_value' => variable_get('comment_default_mode_'. $form['#node_type']->type, COMMENT_MODE_THREADED_EXPANDED),
+      '#options' => _comment_get_modes(),
+      '#description' => t('The default view for comments. Expanded views display the body of the comment. Threaded views keep replies together.'),
+    );
+    $form['comment']['comment_default_order'] = array(
+      '#type' => 'radios',
+      '#title' => t('Default display order'),
+      '#default_value' => variable_get('comment_default_order_'. $form['#node_type']->type, COMMENT_ORDER_NEWEST_FIRST),
+      '#options' => _comment_get_orders(),
+      '#description' => t('The default sorting for new users and anonymous users while viewing comments. These users may change their view using the comment control panel. For registered users, this change is remembered as a persistent user preference.'),
     );
     $form['comment']['comment_default_per_page'] = array(
       '#type' => 'select',
-      '#title' => t('Comments per page'),
-      '#default_value' => variable_get('comment_default_per_page_' . $form['#node_type']->type, 50),
+      '#title' => t('Default comments per page'),
+      '#default_value' => variable_get('comment_default_per_page_'. $form['#node_type']->type, 50),
       '#options' => _comment_per_page(),
+      '#description' => t('Default number of comments for each page: more comments are distributed in several pages.'),
     );
-
-    $form['comment']['comment'] = array(
-      '#type' => 'select',
-      '#title' => t('Default comment setting for new content'),
-      '#default_value' => variable_get('comment_' . $form['#node_type']->type, COMMENT_NODE_OPEN),
-      '#options' => array(t('Hidden'), t('Closed'), t('Open')),
+    $form['comment']['comment_controls'] = array(
+      '#type' => 'radios',
+      '#title' => t('Comment controls'),
+      '#default_value' => variable_get('comment_controls_'. $form['#node_type']->type, COMMENT_CONTROLS_HIDDEN),
+      '#options' => array(
+        t('Display above the comments'),
+        t('Display below the comments'),
+        t('Display above and below the comments'),
+        t('Do not display')),
+      '#description' => t('Position of the comment controls box. The comment controls let the user change the default display mode and display order of comments.'),
     );
     $form['comment']['comment_anonymous'] = array(
-      '#type' => 'select',
+      '#type' => 'radios',
       '#title' => t('Anonymous commenting'),
-      '#default_value' => variable_get('comment_anonymous_' . $form['#node_type']->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT),
+      '#default_value' => variable_get('comment_anonymous_'. $form['#node_type']->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT),
       '#options' => array(
         COMMENT_ANONYMOUS_MAYNOT_CONTACT => t('Anonymous posters may not enter their contact information'),
         COMMENT_ANONYMOUS_MAY_CONTACT => t('Anonymous posters may leave their contact information'),
-        COMMENT_ANONYMOUS_MUST_CONTACT => t('Anonymous posters must leave their contact information'))
+        COMMENT_ANONYMOUS_MUST_CONTACT => t('Anonymous posters must leave their contact information')),
+      '#description' => t('This option is enabled when anonymous users have permission to post comments on the <a href="@url">permissions page</a>.', array('@url' => url('admin/user/permissions', array('fragment' => 'module-comment')))),
     );
-
     if (!user_access('post comments', drupal_anonymous_user())) {
-      $form['comment']['comment_anonymous']['#access'] = FALSE;
+      $form['comment']['comment_anonymous']['#disabled'] = TRUE;
     }
-
     $form['comment']['comment_subject_field'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Allow comment title'),
-      '#default_value' => variable_get('comment_subject_field_' . $form['#node_type']->type, 1),
-    );
-    $form['comment']['comment_form_location'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show reply form on the same page as comments'),
-      '#default_value' => variable_get('comment_form_location_' . $form['#node_type']->type, COMMENT_FORM_BELOW),
+      '#type' => 'radios',
+      '#title' => t('Comment subject field'),
+      '#default_value' => variable_get('comment_subject_field_'. $form['#node_type']->type, 1),
+      '#options' => array(t('Disabled'), t('Enabled')),
+      '#description' => t('Can users provide a unique subject for their comments?'),
     );
     $form['comment']['comment_preview'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Require preview'),
-      '#default_value' => variable_get('comment_preview_' . $form['#node_type']->type, COMMENT_PREVIEW_OPTIONAL),
-    );
-  }
-}
-
-/**
- * Implement hook_form_alter().
- */
-function comment_form_alter(&$form, $form_state, $form_id) {
-  if (!empty($form['#node_edit_form'])) {
-    $node = $form['#node'];
-    $form['comment_settings'] = array(
-      '#type' => 'fieldset',
-      '#access' => user_access('administer comments'),
-      '#title' => t('Comment settings'),
-      '#collapsible' => TRUE,
-      '#collapsed' => TRUE,
-      '#group' => 'additional_settings',
-      '#attached_js' => array(drupal_get_path('module', 'comment') . '/comment-node-form.js'),
-      '#weight' => 30,
-    );
-    $comment_count = isset($node->nid) ? db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = :nid', array(':nid' => $node->nid))->fetchField() : 0;
-    $comment_settings = ($node->comment == COMMENT_NODE_HIDDEN && empty($comment_count)) ? COMMENT_NODE_CLOSED : $node->comment;
-    $form['comment_settings']['comment'] = array(
       '#type' => 'radios',
-      '#parents' => array('comment'),
-      '#default_value' => $comment_settings,
-      '#options' => array(
-        COMMENT_NODE_OPEN => t('Open'),
-        COMMENT_NODE_CLOSED => t('Closed'),
-        COMMENT_NODE_HIDDEN => t('Hidden'),
-      ),
-      COMMENT_NODE_OPEN => array(
-        '#type' => 'radio',
-        '#title' => t('Open'),
-        '#description' => theme('indentation') . t('Users with the "Post comments" permission can post comments.'),
-        '#return_value' => COMMENT_NODE_OPEN,
-        '#default_value' => $comment_settings,
-        '#id' => 'edit-comment-2',
-        '#parents' => array('comment'),
-      ),
-      COMMENT_NODE_CLOSED => array(
-        '#type' => 'radio',
-        '#title' => t('Closed'),
-        '#description' => theme('indentation') . t('Users cannot post comments, but existing comments will be displayed.'),
-        '#return_value' => COMMENT_NODE_CLOSED,
-        '#default_value' => $comment_settings,
-        '#id' => 'edit-comment-1',
-        '#parents' => array('comment'),
-      ),
-      COMMENT_NODE_HIDDEN => array(
-        '#type' => 'radio',
-        '#title' => t('Hidden'),
-        '#description' => theme('indentation') . t('Comments are hidden from view.'),
-        '#return_value' => COMMENT_NODE_HIDDEN,
-        '#default_value' => $comment_settings,
-        '#id' => 'edit-comment-0',
-        '#parents' => array('comment'),
-      ),
+      '#title' => t('Preview comment'),
+      '#default_value' => variable_get('comment_preview_'. $form['#node_type']->type, COMMENT_PREVIEW_REQUIRED),
+      '#options' => array(t('Optional'), t('Required')),
+      '#description' => t("Forces a user to look at their comment by clicking on a 'Preview' button before they can actually add the comment"),
     );
-    // If the node doesn't have any comments, the "hidden" option makes no
-    // sense, so don't even bother presenting it to the user.
-    if (empty($comment_count)) {
-      unset($form['comment_settings']['comment']['#options'][COMMENT_NODE_HIDDEN]);
-      unset($form['comment_settings']['comment'][COMMENT_NODE_HIDDEN]);
-      $form['comment_settings']['comment'][COMMENT_NODE_CLOSED]['#description'] = theme('indentation') . t('Users cannot post comments.');
+    $form['comment']['comment_form_location'] = array(
+      '#type' => 'radios',
+      '#title' => t('Location of comment submission form'),
+      '#default_value' => variable_get('comment_form_location_'. $form['#node_type']->type, COMMENT_FORM_SEPARATE_PAGE),
+      '#options' => array(t('Display on separate page'), t('Display below post or comments')),
+    );
+  }
+  elseif (isset($form['type']) && isset($form['#node'])) {
+    if ($form['type']['#value'] .'_node_form' == $form_id) {
+      $node = $form['#node'];
+      $form['comment_settings'] = array(
+        '#type' => 'fieldset',
+        '#access' => user_access('administer comments'),
+        '#title' => t('Comment settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#weight' => 30,
+      );
+      $form['comment_settings']['comment'] = array(
+        '#type' => 'radios',
+        '#parents' => array('comment'),
+        '#default_value' => $node->comment,
+        '#options' => array(t('Disabled'), t('Read only'), t('Read/Write')),
+      );
     }
   }
 }
 
 /**
- * Implement hook_node_load().
+ * Implementation of hook_nodeapi().
  */
-function comment_node_load($nodes, $types) {
-  $comments_enabled = array();
-
-  // Check if comments are enabled for each node. If comments are disabled,
-  // assign values without hitting the database.
-  foreach ($nodes as $node) {
-    // Store whether comments are enabled for this node.
-    if ($node->comment != COMMENT_NODE_HIDDEN) {
-      $comments_enabled[] = $node->nid;
-    }
-    else {
-      $node->last_comment_timestamp = $node->created;
-      $node->last_comment_name = '';
-      $node->comment_count = 0;
-    }
-  }
-
-  // For nodes with comments enabled, fetch information from the database.
-  if (!empty($comments_enabled)) {
-    $result = db_query('SELECT nid, last_comment_timestamp, last_comment_name, comment_count FROM {node_comment_statistics} WHERE nid IN(:comments_enabled)', array(':comments_enabled' => $comments_enabled));
-    foreach ($result as $record) {
-      $nodes[$record->nid]->last_comment_timestamp = $record->last_comment_timestamp;
-      $nodes[$record->nid]->last_comment_name = $record->last_comment_name;
-      $nodes[$record->nid]->comment_count = $record->comment_count;
-    }
-  }
-}
-
-/**
- * Implement hook_node_prepare().
- */
-function comment_node_prepare($node) {
-  if (!isset($node->comment)) {
-    $node->comment = variable_get("comment_$node->type", COMMENT_NODE_OPEN);
-  }
-}
-
-/**
- * Implement hook_node_insert().
- */
-function comment_node_insert($node) {
-  db_insert('node_comment_statistics')
-    ->fields(array(
-      'nid' => $node->nid,
-      'last_comment_timestamp' => $node->changed,
-      'last_comment_name' => NULL,
-      'last_comment_uid' => $node->uid,
-      'comment_count' => 0,
-    ))
-    ->execute();
-}
-
-/**
- * Implement hook_node_delete().
- */
-function comment_node_delete($node) {
-  db_delete('comment')
-    ->condition('nid', $node->nid)
-    ->execute();
-  db_delete('node_comment_statistics')
-    ->condition('nid', $node->nid)
-    ->execute();
-}
-
-/**
- * Implement hook_node_update_index().
- */
-function comment_node_update_index($node) {
-  $text = '';
-  if ($node->comment != COMMENT_NODE_HIDDEN) {
-    $comments = db_query('SELECT subject, comment, format FROM {comment} WHERE nid = :nid AND status = :status', array(
-      ':nid' => $node->nid,
-      ':status' => COMMENT_PUBLISHED
-    ));
-    foreach ($comments as $comment) {
-      $text .= '<h2>' . check_plain($comment->subject) . '</h2>' . check_markup($comment->comment, $comment->format, '', FALSE);
-    }
-  }
-  return $text;
-}
-
-/**
- * Implement hook_update_index().
- */
-function comment_update_index() {
-  // Store the maximum possible comments per thread (used for ranking by reply count)
-  variable_set('node_cron_comments_scale', 1.0 / max(1, db_query('SELECT MAX(comment_count) FROM {node_comment_statistics}')->fetchField()));
-}
-
-/**
- * Implement hook_node_search_result().
- */
-function comment_node_search_result($node) {
-  if ($node->comment != COMMENT_NODE_HIDDEN) {
-    $comments = db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = :nid', array('nid' => $node->nid))->fetchField();
-    return format_plural($comments, '1 comment', '@count comments');
-  }
-  return '';
-}
-
-/**
- * Implement hook_user_cancel().
- */
-function comment_user_cancel($edit, $account, $method) {
-  switch ($method) {
-    case 'user_cancel_block_unpublish':
-      db_update('comment')
-        ->fields(array('status' => 0))
-        ->condition('uid', $account->uid)
-        ->execute();
-      db_update('node_comment_statistics')
-        ->fields(array('last_comment_uid' => 0))
-        ->condition('last_comment_uid', $account->uid)
-        ->execute();
+function comment_nodeapi(&$node, $op, $arg = 0) {
+  switch ($op) {
+    case 'load':
+      return db_fetch_array(db_query("SELECT last_comment_timestamp, last_comment_name, comment_count FROM {node_comment_statistics} WHERE nid = %d", $node->nid));
       break;
 
-    case 'user_cancel_reassign':
-      db_update('comment')
-        ->fields(array('uid' => 0))
-        ->condition('uid', $account->uid)
-        ->execute();
-      db_update('node_comment_statistics')
-        ->fields(array('last_comment_uid' => 0))
-        ->condition('last_comment_uid', $account->uid)
-        ->execute();
-      break;
-
-    case 'user_cancel_delete':
-      module_load_include('inc', 'comment', 'comment.admin');
-      $result = db_query('SELECT c.cid FROM {comment} c WHERE uid = :uid', array(':uid' => $account->uid))->fetchCol();
-      foreach ($result as $cid) {
-        $comment = comment_load($cid);
-        // Delete the comment and its replies.
-        _comment_delete_thread($comment);
-        _comment_update_node_statistics($comment->nid);
+    case 'prepare':
+      if (!isset($node->comment)) {
+        $node->comment = variable_get("comment_$node->type", COMMENT_NODE_READ_WRITE);
       }
       break;
+
+    case 'insert':
+      db_query('INSERT INTO {node_comment_statistics} (nid, last_comment_timestamp, last_comment_name, last_comment_uid, comment_count) VALUES (%d, %d, NULL, %d, 0)', $node->nid, $node->changed, $node->uid);
+      break;
+
+    case 'delete':
+      db_query('DELETE FROM {comments} WHERE nid = %d', $node->nid);
+      db_query('DELETE FROM {node_comment_statistics} WHERE nid = %d', $node->nid);
+      break;
+
+    case 'update index':
+      $text = '';
+      $comments = db_query('SELECT subject, comment, format FROM {comments} WHERE nid = %d AND status = %d', $node->nid, COMMENT_PUBLISHED);
+      while ($comment = db_fetch_object($comments)) {
+        $text .= '<h2>'. check_plain($comment->subject) .'</h2>'. check_markup($comment->comment, $comment->format, FALSE);
+      }
+      return $text;
+
+    case 'search result':
+      $comments = db_result(db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = %d', $node->nid));
+      return format_plural($comments, '1 comment', '@count comments');
+
+    case 'rss item':
+      if ($node->comment != COMMENT_NODE_DISABLED) {
+        return array(array('key' => 'comments', 'value' => url('node/'. $node->nid, array('fragment' => 'comments', 'absolute' => TRUE))));
+      }
+      else {
+        return array();
+      }
+  }
+}
+
+/**
+ * Implementation of hook_user().
+ */
+function comment_user($type, $edit, &$user, $category = NULL) {
+  if ($type == 'delete') {
+    db_query('UPDATE {comments} SET uid = 0 WHERE uid = %d', $user->uid);
+    db_query('UPDATE {node_comment_statistics} SET last_comment_uid = 0 WHERE last_comment_uid = %d', $user->uid);
   }
 }
 
@@ -836,139 +668,131 @@ function comment_access($op, $comment) {
 }
 
 /**
- * Accepts a submission of new or changed comment content.
+ * A simple helper function.
  *
- * @param $comment
- *   A comment object.
+ * @return
+ *   The 0th and the 1st path components joined by a slash.
  */
-function comment_save($comment) {
-  global $user;
-
-  $defaults =  array(
-    'mail' => '',
-    'homepage' => '',
-    'name' => '',
-    'status' => user_access('post comments without approval') ? COMMENT_PUBLISHED : COMMENT_NOT_PUBLISHED,
-  );
-  foreach ($defaults as $key => $default) {
-    if (!isset($comment->$key)) {
-      $comment->$key = $default;
-    }
-  }
-  if ($comment->cid) {
-    // Update the comment in the database.
-    db_update('comment')
-      ->fields(array(
-        'status' => $comment->status,
-        'timestamp' => $comment->timestamp,
-        'subject' => $comment->subject,
-        'comment' => $comment->comment,
-        'format' => $comment->comment_format,
-        'uid' => $comment->uid,
-        'name' => $comment->name,
-        'mail' => $comment->mail,
-        'homepage' => $comment->homepage,
-      ))
-      ->condition('cid', $comment->cid)
-      ->execute();
-    // Allow modules to respond to the updating of a comment.
-    module_invoke_all('comment_update', $comment);
-    // Add an entry to the watchdog log.
-    watchdog('content', 'Comment: updated %subject.', array('%subject' => $comment->subject), WATCHDOG_NOTICE, l(t('view'), 'comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid)));
-  }
-  else {
-    // Add the comment to database. This next section builds the thread field.
-    // Also see the documentation for comment_render().
-    if ($comment->pid == 0) {
-      // This is a comment with no parent comment (depth 0): we start
-      // by retrieving the maximum thread level.
-      $max = db_query('SELECT MAX(thread) FROM {comment} WHERE nid = :nid', array(':nid' => $comment->nid))->fetchField();
-      // Strip the "/" from the end of the thread.
-      $max = rtrim($max, '/');
-      // Finally, build the thread field for this new comment.
-      $thread = int2vancode(vancode2int($max) + 1) . '/';
-    }
-    else {
-      // This is a comment with a parent comment, so increase the part of the
-      // thread value at the proper depth.
-
-      // Get the parent comment:
-      $parent = comment_load($comment->pid);
-      // Strip the "/" from the end of the parent thread.
-      $parent->thread = (string) rtrim((string) $parent->thread, '/');
-      // Get the max value in *this* thread.
-      $max = db_query("SELECT MAX(thread) FROM {comment} WHERE thread LIKE :thread AND nid = :nid", array(
-        ':thread' => $parent->thread . '.%',
-        ':nid' => $comment->nid,
-      ))->fetchField();
-
-      if ($max == '') {
-        // First child of this parent.
-        $thread = $parent->thread . '.' . int2vancode(0) . '/';
-      }
-      else {
-        // Strip the "/" at the end of the thread.
-        $max = rtrim($max, '/');
-        // Get the value at the correct depth.
-        $parts = explode('.', $max);
-        $parent_depth = count(explode('.', $parent->thread));
-        $last = $parts[$parent_depth];
-        // Finally, build the thread field for this new comment.
-        $thread = $parent->thread . '.' . int2vancode(vancode2int($last) + 1) . '/';
-      }
-    }
-
-    if (empty($comment->timestamp)) {
-      $comment->timestamp = REQUEST_TIME;
-    }
-
-    if ($comment->uid === $user->uid && isset($user->name)) { // '===' Need to modify anonymous users as well.
-      $comment->name = $user->name;
-    }
-
-    $comment->cid = db_insert('comment')
-      ->fields(array(
-        'nid' => $comment->nid,
-        'pid' => empty($comment->pid) ? 0 : $comment->pid,
-        'uid' => $comment->uid,
-        'subject' => $comment->subject,
-        'comment' => $comment->comment,
-        'format' => $comment->comment_format,
-        'hostname' => ip_address(),
-        'timestamp' => $comment->timestamp,
-        'status' => $comment->status,
-        'thread' => $thread,
-        'name' => $comment->name,
-        'mail' => $comment->mail,
-        'homepage' => $comment->homepage,
-      ))
-      ->execute();
-
-    // Ignore slave server temporarily to give time for the
-    // saved node to be propagated to the slave.
-    db_ignore_slave();
-
-    // Tell the other modules a new comment has been submitted.
-    module_invoke_all('comment_insert', $comment);
-    // Add an entry to the watchdog log.
-    watchdog('content', 'Comment: added %subject.', array('%subject' => $comment->subject), WATCHDOG_NOTICE, l(t('view'), 'comment/' . $comment->cid, array('fragment' => 'comment-' . $comment->cid)));
-  }
-  _comment_update_node_statistics($comment->nid);
-  // Clear the cache so an anonymous user can see his comment being added.
-  cache_clear_all();
-
-  if ($comment->status == COMMENT_PUBLISHED) {
-    module_invoke_all('comment_publish', $comment);
-  }
+function comment_node_url() {
+  return arg(0) .'/'. arg(1);
 }
 
 /**
- * Implement hook_link().
+ * Accepts a submission of new or changed comment content.
+ *
+ * @param $edit
+ *   A comment array.
+ *
+ * @return
+ *   If the comment is successfully saved the comment ID is returned. If the comment
+ *   is not saved, FALSE is returned.
  */
-function comment_link($type, $object, $build_mode) {
-  if ($type == 'comment') {
-    $links = comment_links($object, FALSE);
-    return $links;
+function comment_save($edit) {
+  global $user;
+  if (user_access('post comments') && (user_access('administer comments') || node_comment_mode($edit['nid']) == COMMENT_NODE_READ_WRITE)) {
+    if (!form_get_errors()) {
+      $edit += array(
+        'mail' => '',
+        'homepage' => '',
+        'name' => '',
+        'status' => user_access('post comments without approval') ? COMMENT_PUBLISHED : COMMENT_NOT_PUBLISHED,
+      );
+      if ($edit['cid']) {
+        // Update the comment in the database.
+        db_query("UPDATE {comments} SET status = %d, timestamp = %d, subject = '%s', comment = '%s', format = %d, uid = %d, name = '%s', mail = '%s', homepage = '%s' WHERE cid = %d", $edit['status'], $edit['timestamp'], $edit['subject'], $edit['comment'], $edit['format'], $edit['uid'], $edit['name'], $edit['mail'], $edit['homepage'], $edit['cid']);
+
+        // Allow modules to respond to the updating of a comment.
+        comment_invoke_comment($edit, 'update');
+
+        // Add an entry to the watchdog log.
+        watchdog('content', 'Comment: updated %subject.', array('%subject' => $edit['subject']), WATCHDOG_NOTICE, l(t('view'), 'node/'. $edit['nid'], array('fragment' => 'comment-'. $edit['cid'])));
+      }
+      else {
+        // Add the comment to database.
+        // Here we are building the thread field. See the documentation for
+        // comment_render().
+        if ($edit['pid'] == 0) {
+          // This is a comment with no parent comment (depth 0): we start
+          // by retrieving the maximum thread level.
+          $max = db_result(db_query('SELECT MAX(thread) FROM {comments} WHERE nid = %d', $edit['nid']));
+
+          // Strip the "/" from the end of the thread.
+          $max = rtrim($max, '/');
+
+          // Finally, build the thread field for this new comment.
+          $thread = int2vancode(vancode2int($max) + 1) .'/';
+        }
+        else {
+          // This is comment with a parent comment: we increase
+          // the part of the thread value at the proper depth.
+
+          // Get the parent comment:
+          $parent = _comment_load($edit['pid']);
+
+          // Strip the "/" from the end of the parent thread.
+          $parent->thread = (string) rtrim((string) $parent->thread, '/');
+
+          // Get the max value in _this_ thread.
+          $max = db_result(db_query("SELECT MAX(thread) FROM {comments} WHERE thread LIKE '%s.%%' AND nid = %d", $parent->thread, $edit['nid']));
+
+          if ($max == '') {
+            // First child of this parent.
+            $thread = $parent->thread .'.'. int2vancode(0) .'/';
+          }
+          else {
+            // Strip the "/" at the end of the thread.
+            $max = rtrim($max, '/');
+
+            // We need to get the value at the correct depth.
+            $parts = explode('.', $max);
+            $parent_depth = count(explode('.', $parent->thread));
+            $last = $parts[$parent_depth];
+
+            // Finally, build the thread field for this new comment.
+            $thread = $parent->thread .'.'. int2vancode(vancode2int($last) + 1) .'/';
+          }
+        }
+
+        if (empty($edit['timestamp'])) {
+          $edit['timestamp'] = time();
+        }
+
+        if ($edit['uid'] === $user->uid) { // '===' because we want to modify anonymous users too
+          $edit['name'] = $user->name;
+        }
+
+        db_query("INSERT INTO {comments} (nid, pid, uid, subject, comment, format, hostname, timestamp, status, thread, name, mail, homepage) VALUES (%d, %d, %d, '%s', '%s', %d, '%s', %d, %d, '%s', '%s', '%s', '%s')", $edit['nid'], $edit['pid'], $edit['uid'], $edit['subject'], $edit['comment'], $edit['format'], ip_address(), $edit['timestamp'], $edit['status'], $thread, $edit['name'], $edit['mail'], $edit['homepage']);
+        $edit['cid'] = db_last_insert_id('comments', 'cid');
+
+        // Tell the other modules a new comment has been submitted.
+        comment_invoke_comment($edit, 'insert');
+
+        // Add an entry to the watchdog log.
+        watchdog('content', 'Comment: added %subject.', array('%subject' => $edit['subject']), WATCHDOG_NOTICE, l(t('view'), 'node/'. $edit['nid'], array('fragment' => 'comment-'. $edit['cid'])));
+      }
+      _comment_update_node_statistics($edit['nid']);
+
+      // Clear the cache so an anonymous user can see his comment being added.
+      cache_clear_all();
+
+      // Explain the approval queue if necessary, and then
+      // redirect the user to the node he's commenting on.
+      if ($edit['status'] == COMMENT_NOT_PUBLISHED) {
+        drupal_set_message(t('Your comment has been queued for moderation by site administrators and will be published after approval.'));
+      }
+      else {
+        comment_invoke_comment($edit, 'publish');
+      }
+      return $edit['cid'];
+    }
+    else {
+      return FALSE;
+    }
+  }
+  else {
+    watchdog('content', 'Comment: unauthorized comment submitted or comment submitted to a closed post %subject.', array('%subject' => $edit['subject']), WATCHDOG_WARNING);
+    drupal_set_message(t('Comment: unauthorized comment submitted or comment submitted to a closed post %subject.', array('%subject' => $edit['subject'])), 'error');
+    return FALSE;
   }
 }
 
@@ -984,61 +808,48 @@ function comment_link($type, $object, $build_mode) {
  */
 function comment_links($comment, $return = 1) {
   global $user;
+
   $links = array();
 
-  // If viewing just this comment, link back to the in-context view.
+  // If we are viewing just this comment, we link back to the node.
   if ($return) {
     $links['comment_parent'] = array(
       'title' => t('parent'),
-      'href' => 'comment/' . $comment->cid,
+      'href' => comment_node_url(),
       'fragment' => "comment-$comment->cid"
     );
   }
 
-  $node = node_load($comment->nid);
-  if ($node->comment == COMMENT_NODE_OPEN) {
+  if (node_comment_mode($comment->nid) == COMMENT_NODE_READ_WRITE) {
     if (user_access('administer comments') && user_access('post comments')) {
       $links['comment_delete'] = array(
         'title' => t('delete'),
-        'href' => "comment/delete/$comment->cid",
-        'html' => TRUE,
+        'href' => "comment/delete/$comment->cid"
       );
       $links['comment_edit'] = array(
         'title' => t('edit'),
-        'href' => "comment/edit/$comment->cid",
-        'html' => TRUE,
+        'href' => "comment/edit/$comment->cid"
       );
       $links['comment_reply'] = array(
         'title' => t('reply'),
-        'href' => "comment/reply/$comment->nid/$comment->cid",
-        'html' => TRUE,
+        'href' => "comment/reply/$comment->nid/$comment->cid"
       );
-      if ($comment->status == COMMENT_NOT_PUBLISHED) {
-        $links['comment_approve'] = array(
-          'title' => t('approve'),
-          'href' => "comment/approve/$comment->cid",
-          'html' => TRUE,
-        );
-      }
     }
-    elseif (user_access('post comments')) {
+    else if (user_access('post comments')) {
       if (comment_access('edit', $comment)) {
         $links['comment_edit'] = array(
           'title' => t('edit'),
-          'href' => "comment/edit/$comment->cid",
-          'html' => TRUE,
+          'href' => "comment/edit/$comment->cid"
         );
       }
       $links['comment_reply'] = array(
         'title' => t('reply'),
-        'href' => "comment/reply/$comment->nid/$comment->cid",
-        'html' => TRUE,
+        'href' => "comment/reply/$comment->nid/$comment->cid"
       );
     }
     else {
       $node = node_load($comment->nid);
       $links['comment_forbidden']['title'] = theme('comment_post_forbidden', $node);
-      $links['comment_forbidden']['html'] = TRUE;
     }
   }
 
@@ -1093,8 +904,8 @@ function comment_links($comment, $return = 1) {
  * 1.1.1
  *
  * which is what we already did before the standard pager patch. To achieve
- * this we simply add a "/" at the end of each "thread" value. This way, the
- * thread fields will look like this:
+ * this we simply add a "/" at the end of each "thread" value. This way out
+ * thread fields will look like depicted below:
  *
  * 1/
  * 1.1/
@@ -1109,6 +920,7 @@ function comment_links($comment, $return = 1) {
  */
 function comment_render($node, $cid = 0) {
   global $user;
+
   $output = '';
 
   if (user_access('access comments')) {
@@ -1119,25 +931,22 @@ function comment_render($node, $cid = 0) {
     }
 
     $mode = _comment_get_display_setting('mode', $node);
+    $order = _comment_get_display_setting('sort', $node);
     $comments_per_page = _comment_get_display_setting('comments_per_page', $node);
 
     if ($cid && is_numeric($cid)) {
       // Single comment view.
-      $query = db_select('comment', 'c');
-      $query->addField('u', 'name', 'registered_name');
-      $query->innerJoin('users', 'u', 'c.uid = u.uid');
-      $query
-        ->fields('c', array('cid', 'nid', 'pid', 'comment', 'subject', 'format', 'timestamp', 'name', 'mail', 'homepage', 'status'))
-        ->fields('u', array( 'uid', 'signature', 'picture', 'data', 'status'))
-        ->condition('c.cid', $cid);
-
+      $query = 'SELECT c.cid, c.pid, c.nid, c.subject, c.comment, c.format, c.timestamp, c.name, c.mail, c.homepage, u.uid, u.name AS registered_name, u.signature, u.signature_format, u.picture, u.data, c.status FROM {comments} c INNER JOIN {users} u ON c.uid = u.uid WHERE c.cid = %d';
+      $query_args = array($cid);
       if (!user_access('administer comments')) {
-        $query->condition('c.status', COMMENT_PUBLISHED);
+        $query .= ' AND c.status = %d';
+        $query_args[] = COMMENT_PUBLISHED;
       }
 
-      $result = $query->execute();
+      $query = db_rewrite_sql($query, 'c', 'cid');
+      $result = db_query($query, $query_args);
 
-      if ($comment = $result->fetchObject()) {
+      if ($comment = db_fetch_object($result)) {
         $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
         $links = module_invoke_all('link', 'comment', $comment, 1);
         drupal_alter('link', $links, $node);
@@ -1145,55 +954,53 @@ function comment_render($node, $cid = 0) {
         $output .= theme('comment_view', $comment, $node, $links);
       }
     }
-    // Only attempt to render comments if the node has visible comments.
-    // Unpublished comments are not included in $node->comment_count, so show
-    // comments unconditionally if the user is an administrator.
-    elseif ($node->comment_count || user_access('administer comments')) {
+    else {
+      // Multiple comment view
+      $query_count = 'SELECT COUNT(*) FROM {comments} c WHERE c.nid = %d';
+      $query = 'SELECT c.cid as cid, c.pid, c.nid, c.subject, c.comment, c.format, c.timestamp, c.name, c.mail, c.homepage, u.uid, u.name AS registered_name, u.signature, u.signature_format, u.picture, u.data, c.thread, c.status FROM {comments} c INNER JOIN {users} u ON c.uid = u.uid WHERE c.nid = %d';
 
-      // Multiple comment view.
-      $query = db_select('comment', 'c')->extend('PagerDefault');
-      $query->join('users', 'u', 'c.uid = u.uid');
-      $query->addField('u', 'name', 'registered_name');
-      $query
-        ->fields('c', array('cid', 'pid', 'nid', 'subject', 'comment', 'format', 'timestamp', 'name', 'mail', 'homepage', 'thread', 'status'))
-        ->fields('u', array('uid', 'signature', 'picture', 'data'))
-        ->condition('c.nid', $nid)
-        ->addTag('node_access')
-        ->limit($comments_per_page);
-
-      $count_query = db_select('comment', 'c');
-      $count_query->addExpression('COUNT(*)');
-      $count_query
-        ->condition('c.nid', $nid)
-        ->addTag('node_access');
-
+      $query_args = array($nid);
       if (!user_access('administer comments')) {
-        $query->condition('c.status', COMMENT_PUBLISHED);
-        $count_query->condition('c.status', COMMENT_PUBLISHED);
-      }
-      if ($mode === COMMENT_MODE_FLAT) {
-        $query->orderBy('c.cid', 'ASC');
-      }
-      else {
-        // See comment above. Analysis reveals that this doesn't cost too
-        // much. It scales much much better than having the whole comment
-        // structure.
-        $query->orderBy('SUBSTRING(c.thread, 1, (LENGTH(c.thread) - 1))', 'ASC');
+        $query .= ' AND c.status = %d';
+        $query_count .= ' AND c.status = %d';
+        $query_args[] = COMMENT_PUBLISHED;
       }
 
-      $query->setCountQuery($count_query);
-      $result = $query->execute();
+      if ($order == COMMENT_ORDER_NEWEST_FIRST) {
+        if ($mode == COMMENT_MODE_FLAT_COLLAPSED || $mode == COMMENT_MODE_FLAT_EXPANDED) {
+          $query .= ' ORDER BY c.cid DESC';
+        }
+        else {
+          $query .= ' ORDER BY c.thread DESC';
+        }
+      }
+      else if ($order == COMMENT_ORDER_OLDEST_FIRST) {
+        if ($mode == COMMENT_MODE_FLAT_COLLAPSED || $mode == COMMENT_MODE_FLAT_EXPANDED) {
+          $query .= ' ORDER BY c.cid';
+        }
+        else {
+          // See comment above. Analysis reveals that this doesn't cost too
+          // much. It scales much much better than having the whole comment
+          // structure.
+          $query .= ' ORDER BY SUBSTRING(c.thread, 1, (LENGTH(c.thread) - 1))';
+        }
+      }
+      $query = db_rewrite_sql($query, 'c', 'cid');
+      $query_count = db_rewrite_sql($query_count, 'c', 'cid');
+
+      // Start a form, for use with comment control.
+      $result = pager_query($query, $comments_per_page, 0, $query_count, $query_args);
 
       $divs = 0;
       $num_rows = FALSE;
       $comments = '';
-      drupal_add_css(drupal_get_path('module', 'comment') . '/comment.css');
-      foreach ($result as $comment) {
+      drupal_add_css(drupal_get_path('module', 'comment') .'/comment.css');
+      while ($comment = db_fetch_object($result)) {
         $comment = drupal_unpack($comment);
         $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
         $comment->depth = count(explode('.', $comment->thread)) - 1;
 
-        if ($mode == COMMENT_MODE_THREADED) {
+        if ($mode == COMMENT_MODE_THREADED_COLLAPSED || $mode == COMMENT_MODE_THREADED_EXPANDED) {
           if ($comment->depth > $divs) {
             $divs++;
             $comments .= '<div class="indented">';
@@ -1206,26 +1013,44 @@ function comment_render($node, $cid = 0) {
           }
         }
 
-        if ($mode == COMMENT_MODE_FLAT) {
+        if ($mode == COMMENT_MODE_FLAT_COLLAPSED) {
+          $comments .= theme('comment_flat_collapsed', $comment, $node);
+        }
+        else if ($mode == COMMENT_MODE_FLAT_EXPANDED) {
           $comments .= theme('comment_flat_expanded', $comment, $node);
         }
-        elseif ($mode == COMMENT_MODE_THREADED) {
+        else if ($mode == COMMENT_MODE_THREADED_COLLAPSED) {
+          $comments .= theme('comment_thread_collapsed', $comment, $node);
+        }
+        else if ($mode == COMMENT_MODE_THREADED_EXPANDED) {
           $comments .= theme('comment_thread_expanded', $comment, $node);
         }
+
         $num_rows = TRUE;
       }
       while ($divs-- > 0) {
         $comments .= '</div>';
       }
+
+      $comment_controls = variable_get('comment_controls_'. $node->type, COMMENT_CONTROLS_HIDDEN);
+      if ($num_rows && ($comment_controls == COMMENT_CONTROLS_ABOVE || $comment_controls == COMMENT_CONTROLS_ABOVE_BELOW)) {
+        $output .= drupal_get_form('comment_controls', $mode, $order, $comments_per_page);
+      }
+
       $output .= $comments;
-      $output .= theme('pager', NULL);
+      $output .= theme('pager', NULL, $comments_per_page, 0);
+
+      if ($num_rows && ($comment_controls == COMMENT_CONTROLS_BELOW || $comment_controls == COMMENT_CONTROLS_ABOVE_BELOW)) {
+        $output .= drupal_get_form('comment_controls', $mode, $order, $comments_per_page);
+      }
     }
 
     // If enabled, show new comment form if it's not already being displayed.
     $reply = arg(0) == 'comment' && arg(1) == 'reply';
-    if (user_access('post comments') && $node->comment == COMMENT_NODE_OPEN && (variable_get('comment_form_location_' . $node->type, COMMENT_FORM_BELOW) == COMMENT_FORM_BELOW) && !$reply) {
-      $output .= theme('comment_form_box', array('nid' => $nid), t('Post new comment'));
+    if (user_access('post comments') && node_comment_mode($nid) == COMMENT_NODE_READ_WRITE && (variable_get('comment_form_location_'. $node->type, COMMENT_FORM_SEPARATE_PAGE) == COMMENT_FORM_BELOW) && !$reply) {
+      $output .= comment_form_box(array('nid' => $nid), t('Post new comment'));
     }
+
     if ($output) {
       $output = theme('comment_wrapper', $output, $node);
     }
@@ -1235,8 +1060,8 @@ function comment_render($node, $cid = 0) {
 }
 
 /**
- * Comment operations. Offer different update operations depending on
- * which comment administration page is being viewed.
+ * Comment operations. We offer different update operations depending on
+ * which comment administration page we're on.
  *
  * @param $action
  *   The comment administration page.
@@ -1246,29 +1071,28 @@ function comment_render($node, $cid = 0) {
 function comment_operations($action = NULL) {
   if ($action == 'publish') {
     $operations = array(
-      'publish' => array(t('Publish the selected comments'), db_update('comment')->fields(array( 'status' => COMMENT_PUBLISHED)) ),
+      'publish' => array(t('Publish the selected comments'), 'UPDATE {comments} SET status = '. COMMENT_PUBLISHED .' WHERE cid = %d'),
       'delete' => array(t('Delete the selected comments'), '')
     );
   }
-  elseif ($action == 'unpublish') {
+  else if ($action == 'unpublish') {
     $operations = array(
-      'unpublish' => array(t('Unpublish the selected comments'), db_update('comment')->fields(array( 'status' => COMMENT_NOT_PUBLISHED)) ),
+      'unpublish' => array(t('Unpublish the selected comments'), 'UPDATE {comments} SET status = '. COMMENT_NOT_PUBLISHED .' WHERE cid = %d'),
       'delete' => array(t('Delete the selected comments'), '')
     );
   }
   else {
     $operations = array(
-      'publish' => array(t('Publish the selected comments'), db_update('comment')->fields(array( 'status' => COMMENT_PUBLISHED)) ),
-      'unpublish' => array(t('Unpublish the selected comments'), db_update('comment')->fields(array( 'status' => COMMENT_NOT_PUBLISHED)) ),
+      'publish' => array(t('Publish the selected comments'), 'UPDATE {comments} SET status = '. COMMENT_PUBLISHED .' WHERE cid = %d'),
+      'unpublish' => array(t('Unpublish the selected comments'), 'UPDATE {comments} SET status = '. COMMENT_NOT_PUBLISHED .' WHERE cid = %d'),
       'delete' => array(t('Delete the selected comments'), '')
     );
   }
-
   return $operations;
 }
 
 /**
- * Begin the misc functions: helpers, privates, history.
+ * Misc functions: helpers, privates, history
  */
 
 /**
@@ -1279,8 +1103,25 @@ function comment_operations($action = NULL) {
  * @return
  *   The comment object.
  */
-function comment_load($cid) {
-  return db_query('SELECT * FROM {comment} WHERE cid = :cid', array(':cid' => $cid))->fetchObject();
+function _comment_load($cid) {
+  return db_fetch_object(db_query('SELECT * FROM {comments} WHERE cid = %d', $cid));
+}
+
+/**
+ * Get comment count for a node.
+ *
+ * @param $nid
+ *   The node id.
+ * @return
+ *   The comment count.
+ */
+function comment_num_all($nid) {
+  static $cache;
+
+  if (!isset($cache[$nid])) {
+    $cache[$nid] = db_result(db_query('SELECT comment_count FROM {node_comment_statistics} WHERE nid = %d', $nid));
+  }
+  return $cache[$nid];
 }
 
 /**
@@ -1292,13 +1133,10 @@ function comment_load($cid) {
  *   The replies count.
  */
 function comment_num_replies($pid) {
-  $cache = &drupal_static(__FUNCTION__, array());
+  static $cache;
 
   if (!isset($cache[$pid])) {
-    $cache[$pid] = db_query('SELECT COUNT(cid) FROM {comment} WHERE pid = :pid AND status = :status', array(
-      ':pid' => $pid,
-      ':status' => COMMENT_PUBLISHED,
-    ))->fetchField();
+    $cache[$pid] = db_result(db_query('SELECT COUNT(cid) FROM {comments} WHERE pid = %d AND status = %d', $pid, COMMENT_PUBLISHED));
   }
 
   return $cache[$pid];
@@ -1308,94 +1146,91 @@ function comment_num_replies($pid) {
  * Get number of new comments for current user and specified node.
  *
  * @param $nid
- *   Node-id to count comments for.
+ *   node-id to count comments for
  * @param $timestamp
- *   Time to count from (defaults to time of last user access
- *   to node).
- * @return The result or FALSE on error.
+ *   time to count from (defaults to time of last user access
+ *   to node)
  */
 function comment_num_new($nid, $timestamp = 0) {
   global $user;
 
   if ($user->uid) {
-    // Retrieve the timestamp at which the current user last viewed this node.
+    // Retrieve the timestamp at which the current user last viewed the
+    // specified node.
     if (!$timestamp) {
       $timestamp = node_last_viewed($nid);
     }
     $timestamp = ($timestamp > NODE_NEW_LIMIT ? $timestamp : NODE_NEW_LIMIT);
 
     // Use the timestamp to retrieve the number of new comments.
-    return db_query('SELECT COUNT(cid) FROM {comment} WHERE nid = :nid  AND timestamp > :timestamp AND status = :status', array(
-      ':nid' => $nid,
-      ':timestamp' => $timestamp,
-      ':status' => COMMENT_PUBLISHED,
-      ))->fetchField();
+    $result = db_result(db_query('SELECT COUNT(c.cid) FROM {node} n INNER JOIN {comments} c ON n.nid = c.nid WHERE n.nid = %d AND timestamp > %d AND c.status = %d', $nid, $timestamp, COMMENT_PUBLISHED));
+
+    return $result;
   }
   else {
-    return FALSE;
+    return 0;
   }
 
 }
 
 /**
- * Get the display ordinal for a comment, starting from 0.
+ * Validate comment data.
  *
- * Count the number of comments which appear before the comment we want to
- * display, taking into account display settings and threading.
- *
- * @param $cid
- *   The comment ID.
- * @param $node_type
- *   The node type of the comment's parent.
+ * @param $edit
+ *   An associative array containig the comment data.
  * @return
- *   The display ordinal for the comment.
- * @see comment_get_display_page()
+ *   The original $edit.
  */
-function comment_get_display_ordinal($cid, $node_type) {
-  // Count how many comments (c1) are before $cid (c2) in display order. This is
-  // the 0-based display ordinal.
-  $query = db_select('comment', 'c1');
-  $query->innerJoin('comment', 'c2', 'c2.nid = c1.nid');
-  $query->addExpression('COUNT(*)', 'count');
-  $query->condition('c2.cid', $cid);
-  if (!user_access('administer comments')) {
-    $query->condition('c1.status', COMMENT_PUBLISHED);
-  }
-  $mode = variable_get('comment_default_mode_' . $node_type, COMMENT_MODE_THREADED);
+function comment_validate($edit) {
+  global $user;
 
-  if ($mode == COMMENT_MODE_FLAT) {
-    // For flat comments, cid is used for ordering comments due to
-    // unpredicatable behavior with timestamp, so we make the same assumption
-    // here.
-    $query->condition('c1.cid', $cid, '<');
+  // Invoke other validation handlers
+  comment_invoke_comment($edit, 'validate');
+
+  if (isset($edit['date'])) {
+    // As of PHP 5.1.0, strtotime returns FALSE upon failure instead of -1.
+    if (strtotime($edit['date']) <= 0) {
+      form_set_error('date', t('You have to specify a valid date.'));
+    }
   }
-  else {
-    // For threaded comments, the c.thread column is used for ordering. We can
-    // use the vancode for comparison, but must remove the trailing slash.
-    // @see comment_render().
-    $query->where('SUBSTRING(c1.thread, 1, (LENGTH(c1.thread) -1)) < SUBSTRING(c2.thread, 1, (LENGTH(c2.thread) -1))');
+  if (isset($edit['author']) && !$account = user_load(array('name' => $edit['author']))) {
+    form_set_error('author', t('You have to specify a valid author.'));
   }
 
-  return $query->execute()->fetchField();
-}
+  // Check validity of name, mail and homepage (if given)
+  if (!$user->uid || isset($edit['is_anonymous'])) {
+    $node = node_load($edit['nid']);
+    if (variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) > COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
+      if ($edit['name']) {
+        $taken = db_result(db_query("SELECT COUNT(uid) FROM {users} WHERE LOWER(name) = '%s'", $edit['name']));
 
-/**
- * Return the page number for a comment.
- *
- * Finds the correct page number for a comment taking into account display
- * and paging settings.
- *
- * @param $cid
- *   The comment ID.
- * @param $node_type
- *   The node type the comment is attached to.
- * @return
- *   The page number.
- */
-function comment_get_display_page($cid, $node_type) {
-  $ordinal = comment_get_display_ordinal($cid, $node_type);
-  $comments_per_page = variable_get('comment_default_per_page_' . $node_type, 50);
-  return floor($ordinal / $comments_per_page);
+        if ($taken != 0) {
+          form_set_error('name', t('The name you used belongs to a registered user.'));
+        }
+
+      }
+      else if (variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
+        form_set_error('name', t('You have to leave your name.'));
+      }
+
+      if ($edit['mail']) {
+        if (!valid_email_address($edit['mail'])) {
+          form_set_error('mail', t('The e-mail address you specified is not valid.'));
+        }
+      }
+      else if (variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
+        form_set_error('mail', t('You have to leave an e-mail address.'));
+      }
+
+      if ($edit['homepage']) {
+        if (!valid_url($edit['homepage'], TRUE)) {
+          form_set_error('homepage', t('The URL of your homepage is not valid. Remember that it must be fully qualified, i.e. of the form <code>http://example.com/directory</code>.'));
+        }
+      }
+    }
+  }
+
+  return $edit;
 }
 
 /**
@@ -1409,14 +1244,14 @@ function comment_get_display_page($cid, $node_type) {
  */
 function comment_form(&$form_state, $edit, $title = NULL) {
   global $user;
+
   $op = isset($_POST['op']) ? $_POST['op'] : '';
   $node = node_load($edit['nid']);
 
-  if (!$user->uid && variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) != COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
-    drupal_add_js(drupal_get_path('module', 'comment') . '/comment.js');
+  if (!$user->uid && variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) != COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
+    drupal_add_js(drupal_get_path('module', 'comment') .'/comment.js');
   }
   $edit += array('name' => '', 'mail' => '', 'homepage' => '');
-
   if ($user->uid) {
     if (!empty($edit['cid']) && user_access('administer comments')) {
       if (!empty($edit['author'])) {
@@ -1452,7 +1287,7 @@ function comment_form(&$form_state, $edit, $title = NULL) {
       );
 
       if ($edit['registered_name'] != '') {
-        // The comment is by a registered user.
+        // The comment is by a registered user
         $form['admin']['author'] = array(
           '#type' => 'textfield',
           '#title' => t('Authored by'),
@@ -1464,7 +1299,7 @@ function comment_form(&$form_state, $edit, $title = NULL) {
         );
       }
       else {
-        // The comment is by an anonymous user.
+        // The comment is by an anonymous user
         $form['is_anonymous'] = array(
           '#type' => 'value',
           '#value' => TRUE,
@@ -1485,6 +1320,7 @@ function comment_form(&$form_state, $edit, $title = NULL) {
           '#default_value' => $edit['mail'],
           '#description' => t('The content of this field is kept private and will not be shown publicly.'),
         );
+
         $form['admin']['homepage'] = array(
           '#type' => 'textfield',
           '#title' => t('Homepage'),
@@ -1493,92 +1329,37 @@ function comment_form(&$form_state, $edit, $title = NULL) {
           '#default_value' => $edit['homepage'],
         );
       }
-      $form['admin']['date'] = array(
-        '#type' => 'textfield',
-        '#parents' => array('date'),
-        '#title' => t('Authored on'),
-        '#size' => 20,
-        '#maxlength' => 25,
-        '#default_value' => $date,
-        '#weight' => -1,
-      );
-      $form['admin']['status'] = array(
-        '#type' => 'radios',
-        '#parents' => array('status'),
-        '#title' => t('Status'),
-        '#default_value' =>  $status,
-        '#options' => array(t('Not published'), t('Published')),
-        '#weight' => -1,
-      );
+
+      $form['admin']['date'] = array('#type' => 'textfield', '#parents' => array('date'), '#title' => t('Authored on'), '#size' => 20, '#maxlength' => 25, '#default_value' => $date, '#weight' => -1);
+
+      $form['admin']['status'] = array('#type' => 'radios', '#parents' => array('status'), '#title' => t('Status'), '#default_value' =>  $status, '#options' => array(t('Published'), t('Not published')), '#weight' => -1);
+
     }
     else {
-      $form['_author'] = array(
-        '#type' => 'item',
-        '#title' => t('Your name'),
-        '#markup' => theme('username', $user),
+      $form['_author'] = array('#type' => 'item', '#title' => t('Your name'), '#value' => theme('username', $user)
       );
-      $form['author'] = array(
-        '#type' => 'value',
-        '#value' => $user->name,
-      );
+      $form['author'] = array('#type' => 'value', '#value' => $user->name);
     }
   }
-  elseif (variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MAY_CONTACT) {
-    $form['name'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Your name'),
-      '#maxlength' => 60,
-      '#size' => 30,
-      '#default_value' => $edit['name'] ? $edit['name'] : variable_get('anonymous', t('Anonymous')),
+  else if (variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MAY_CONTACT) {
+    $form['name'] = array('#type' => 'textfield', '#title' => t('Your name'), '#maxlength' => 60, '#size' => 30, '#default_value' => $edit['name'] ? $edit['name'] : variable_get('anonymous', t('Anonymous'))
     );
-    $form['mail'] = array(
-      '#type' => 'textfield',
-      '#title' => t('E-mail'),
-      '#maxlength' => 64,
-      '#size' => 30,
-      '#default_value' => $edit['mail'], '#description' => t('The content of this field is kept private and will not be shown publicly.'),
+
+    $form['mail'] = array('#type' => 'textfield', '#title' => t('E-mail'), '#maxlength' => 64, '#size' => 30, '#default_value' => $edit['mail'], '#description' => t('The content of this field is kept private and will not be shown publicly.')
     );
-    $form['homepage'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Homepage'),
-      '#maxlength' => 255,
-      '#size' => 30,
-      '#default_value' => $edit['homepage'],
-    );
+
+    $form['homepage'] = array('#type' => 'textfield', '#title' => t('Homepage'), '#maxlength' => 255, '#size' => 30, '#default_value' => $edit['homepage']);
   }
-  elseif (variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
-    $form['name'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Your name'),
-      '#maxlength' => 60,
-      '#size' => 30,
-      '#default_value' => $edit['name'] ? $edit['name'] : variable_get('anonymous', t('Anonymous')),
-      '#required' => TRUE,
-    );
-    $form['mail'] = array(
-      '#type' => 'textfield',
-      '#title' => t('E-mail'),
-      '#maxlength' => 64,
-      '#size' => 30,
-      '#default_value' => $edit['mail'], '#description' => t('The content of this field is kept private and will not be shown publicly.'),
-      '#required' => TRUE,
-    );
-    $form['homepage'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Homepage'),
-      '#maxlength' => 255,
-      '#size' => 30,
-      '#default_value' => $edit['homepage'],
-    );
+  else if (variable_get('comment_anonymous_'. $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
+    $form['name'] = array('#type' => 'textfield', '#title' => t('Your name'), '#maxlength' => 60, '#size' => 30, '#default_value' => $edit['name'] ? $edit['name'] : variable_get('anonymous', t('Anonymous')), '#required' => TRUE);
+
+    $form['mail'] = array('#type' => 'textfield', '#title' => t('E-mail'), '#maxlength' => 64, '#size' => 30, '#default_value' => $edit['mail'], '#description' => t('The content of this field is kept private and will not be shown publicly.'), '#required' => TRUE);
+
+    $form['homepage'] = array('#type' => 'textfield', '#title' => t('Homepage'), '#maxlength' => 255, '#size' => 30, '#default_value' => $edit['homepage']);
   }
 
-  if (variable_get('comment_subject_field_' . $node->type, 1) == 1) {
-    $form['subject'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Subject'),
-      '#maxlength' => 64,
-      '#default_value' => !empty($edit['subject']) ? $edit['subject'] : '',
-    );
+  if (variable_get('comment_subject_field_'. $node->type, 1) == 1) {
+    $form['subject'] = array('#type' => 'textfield', '#title' => t('Subject'), '#maxlength' => 64, '#default_value' => !empty($edit['subject']) ? $edit['subject'] : '');
   }
 
   if (!empty($edit['comment'])) {
@@ -1588,56 +1369,39 @@ function comment_form(&$form_state, $edit, $title = NULL) {
     $default = '';
   }
 
-  $form['comment'] = array(
+  $form['comment_filter']['comment'] = array(
     '#type' => 'textarea',
     '#title' => t('Comment'),
     '#rows' => 15,
     '#default_value' => $default,
-    '#text_format' => isset($edit['format']) ? $edit['format'] : FILTER_FORMAT_DEFAULT,
     '#required' => TRUE,
   );
-
-  $form['cid'] = array(
-    '#type' => 'value',
-    '#value' => !empty($edit['cid']) ? $edit['cid'] : NULL,
-  );
-  $form['pid'] = array(
-    '#type' => 'value',
-    '#value' => !empty($edit['pid']) ? $edit['pid'] : NULL,
-  );
-  $form['nid'] = array(
-    '#type' => 'value',
-    '#value' => $edit['nid'],
-  );
-  $form['uid'] = array(
-    '#type' => 'value',
-    '#value' => !empty($edit['uid']) ? $edit['uid'] : 0,
-  );
-
-  // Only show the save button if comment previews are optional or if we are
-  // already previewing the submission. However, if there are form errors,
-  // we hide the save button no matter what, so that optional form elements
-  // (e.g., captchas) can be updated.
-  if (!form_get_errors() && ((variable_get('comment_preview_' . $node->type, COMMENT_PREVIEW_OPTIONAL) == COMMENT_PREVIEW_OPTIONAL) || ($op == t('Preview')) || ($op == t('Save')))) {
-    $form['submit'] = array(
-      '#type' => 'submit',
-      '#value' => t('Save'),
-      '#weight' => 19,
-    );
+  if (!isset($edit['format'])) {
+    $edit['format'] = FILTER_FORMAT_DEFAULT;
   }
-  $form['preview'] = array(
-    '#type' => 'button',
-    '#value' => t('Preview'),
-    '#weight' => 20,
-  );
-  $form['#token'] = 'comment' . $edit['nid'] . (isset($edit['pid']) ? $edit['pid'] : '');
+  $form['comment_filter']['format'] = filter_form($edit['format']);
+
+  $form['cid'] = array('#type' => 'value', '#value' => !empty($edit['cid']) ? $edit['cid'] : NULL);
+  $form['pid'] = array('#type' => 'value', '#value' => !empty($edit['pid']) ? $edit['pid'] : NULL);
+  $form['nid'] = array('#type' => 'value', '#value' => $edit['nid']);
+  $form['uid'] = array('#type' => 'value', '#value' => !empty($edit['uid']) ? $edit['uid'] : NULL);
+
+  // Only show save button if preview is optional or if we are in preview mode.
+  // We show the save button in preview mode even if there are form errors so that
+  // optional form elements (e.g., captcha) can be updated in preview mode.
+  if (!form_get_errors() && ((variable_get('comment_preview_'. $node->type, COMMENT_PREVIEW_REQUIRED) == COMMENT_PREVIEW_OPTIONAL) || ($op == t('Preview')) || ($op == t('Save')))) {
+    $form['submit'] = array('#type' => 'submit', '#value' => t('Save'), '#weight' => 19);
+  }
+
+  $form['preview'] = array('#type' => 'button', '#value' => t('Preview'), '#weight' => 20);
+  $form['#token'] = 'comment'. $edit['nid'] . (isset($edit['pid']) ? $edit['pid'] : '');
 
   if ($op == t('Preview')) {
     $form['#after_build'] = array('comment_form_add_preview');
   }
 
   if (empty($edit['cid']) && empty($edit['pid'])) {
-    $form['#action'] = url('comment/reply/' . $edit['nid']);
+    $form['#action'] = url('comment/reply/'. $edit['nid']);
   }
 
   return $form;
@@ -1650,13 +1414,9 @@ function comment_form(&$form_state, $edit, $title = NULL) {
  *   The form structure.
  * @param $title
  *   The form title.
- * @return
- *   A string containing the box output.
  */
-function theme_comment_form_box($edit, $title = NULL) {
-  $content = drupal_render(drupal_get_form('comment_form', $edit, $title));
-  $output = '<h2 class="title">' . $title . '</h2><div>' . $content . '</div>';
-  return $output;
+function comment_form_box($edit, $title = NULL) {
+  return theme('box', $title, drupal_get_form('comment_form', $edit, $title));
 }
 
 /**
@@ -1667,28 +1427,27 @@ function theme_comment_form_box($edit, $title = NULL) {
 function comment_form_add_preview($form, &$form_state) {
   global $user;
   $edit = $form_state['values'];
-  drupal_set_title(t('Preview comment'), PASS_THROUGH);
+  drupal_set_title(t('Preview comment'));
+
   $output = '';
   $node = node_load($edit['nid']);
 
   // Invoke full validation for the form, to protect against cross site
   // request forgeries (CSRF) and setting arbitrary values for fields such as
-  // the text format. Preview the comment only when form validation does not
+  // the input format. Preview the comment only when form validation does not
   // set any errors.
   drupal_validate_form($form['form_id']['#value'], $form, $form_state);
   if (!form_get_errors()) {
     _comment_form_submit($edit);
     $comment = (object)$edit;
-    $comment->format = $comment->comment_format;
 
     // Attach the user and time information.
     if (!empty($edit['author'])) {
-      $account = user_load_by_name($edit['author']);
+      $account = user_load(array('name' => $edit['author']));
     }
     elseif ($user->uid && !isset($edit['is_anonymous'])) {
       $account = $user;
     }
-
     if (!empty($account)) {
       $comment->uid = $account->uid;
       $comment->name = check_plain($account->name);
@@ -1696,39 +1455,31 @@ function comment_form_add_preview($form, &$form_state) {
     elseif (empty($comment->name)) {
       $comment->name = variable_get('anonymous', t('Anonymous'));
     }
-
-    $comment->timestamp = !empty($edit['timestamp']) ? $edit['timestamp'] : REQUEST_TIME;
+    $comment->timestamp = !empty($edit['timestamp']) ? $edit['timestamp'] : time();
     $output .= theme('comment_view', $comment, $node);
   }
-
   $form['comment_preview'] = array(
-    '#markup' => $output,
+    '#value' => $output,
     '#weight' => -100,
     '#prefix' => '<div class="preview">',
     '#suffix' => '</div>',
   );
 
-  $output = ''; // Isn't this line a duplication of the first $output above?
+  $output = '';
 
   if ($edit['pid']) {
-    $comment = db_query('SELECT c.*, u.uid, u.name AS registered_name, u.signature, u.picture, u.data FROM {comment} c INNER JOIN {users} u ON c.uid = u.uid WHERE c.cid = :cid AND c.status = :status', array(
-      ':cid' => $edit['pid'],
-      ':status' => COMMENT_PUBLISHED,
-      ))->fetchObject();
+    $comment = db_fetch_object(db_query('SELECT c.*, u.uid, u.name AS registered_name, u.signature, u.signature_format, u.picture, u.data FROM {comments} c INNER JOIN {users} u ON c.uid = u.uid WHERE c.cid = %d AND c.status = %d', $edit['pid'], COMMENT_PUBLISHED));
     $comment = drupal_unpack($comment);
     $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
     $output .= theme('comment_view', $comment, $node);
   }
   else {
     $suffix = empty($form['#suffix']) ? '' : $form['#suffix'];
-    $form['#suffix'] = $suffix . drupal_render(node_build($node));
+    $form['#suffix'] = $suffix . node_view($node);
     $edit['pid'] = 0;
   }
 
-  $form['comment_preview_below'] = array(
-    '#markup' => $output,
-    '#weight' => 100,
-  );
+  $form['comment_preview_below'] = array('#value' => $output, '#weight' => 100);
 
   return $form;
 }
@@ -1742,56 +1493,11 @@ function comment_form_validate($form, &$form_state) {
     foreach (array('name', 'homepage', 'mail') as $field) {
       // Set cookie for 365 days.
       if (isset($form_state['values'][$field])) {
-        setcookie('comment_info_' . $field, $form_state['values'][$field], REQUEST_TIME + 31536000, '/');
+        setcookie('comment_info_'. $field, $form_state['values'][$field], time() + 31536000, '/');
       }
     }
   }
-
-  if (isset($form_state['values']['date'])) {
-    if (strtotime($form_state['values']['date']) === FALSE) {
-      form_set_error('date', t('You have to specify a valid date.'));
-    }
-  }
-  if (isset($form_state['values']['author']) && !$account = user_load_by_name($form_state['values']['author'])) {
-    form_set_error('author', t('You have to specify a valid author.'));
-  }
-
-  // Check validity of name, mail and homepage (if given).
-  if (!$user->uid || isset($form_state['values']['is_anonymous'])) {
-    $node = node_load($form_state['values']['nid']);
-    if (variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) > COMMENT_ANONYMOUS_MAYNOT_CONTACT) {
-      if ($form_state['values']['name']) {
-        $query = db_select('users', 'u');
-        $query->addField('u', 'uid', 'uid');
-        $taken = $query
-          ->where('LOWER(name) = :name', array(':name' => $form_state['values']['name']))
-          ->countQuery()
-          ->execute()
-          ->fetchField();
-        if ($taken != 0) {
-          form_set_error('name', t('The name you used belongs to a registered user.'));
-        }
-      }
-      elseif (variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
-        form_set_error('name', t('You have to leave your name.'));
-      }
-
-      if ($form_state['values']['mail']) {
-        if (!valid_email_address($form_state['values']['mail'])) {
-          form_set_error('mail', t('The e-mail address you specified is not valid.'));
-        }
-      }
-      elseif (variable_get('comment_anonymous_' . $node->type, COMMENT_ANONYMOUS_MAYNOT_CONTACT) == COMMENT_ANONYMOUS_MUST_CONTACT) {
-        form_set_error('mail', t('You have to leave an e-mail address.'));
-      }
-
-      if ($form_state['values']['homepage']) {
-        if (!valid_url($form_state['values']['homepage'], TRUE)) {
-          form_set_error('homepage', t('The URL of your homepage is not valid. Remember that it must be fully qualified, i.e. of the form <code>http://example.com/directory</code>.'));
-        }
-      }
-    }
-  }
+  comment_validate($form_state['values']);
 }
 
 /**
@@ -1805,22 +1511,21 @@ function _comment_form_submit(&$comment_values) {
   if (!isset($comment_values['date'])) {
     $comment_values['date'] = 'now';
   }
-
   $comment_values['timestamp'] = strtotime($comment_values['date']);
   if (isset($comment_values['author'])) {
-    $account = user_load_by_name($comment_values['author']);
+    $account = user_load(array('name' => $comment_values['author']));
     $comment_values['uid'] = $account->uid;
     $comment_values['name'] = $comment_values['author'];
   }
-
-  // Validate the comment's subject. If not specified, extract from comment body.
+  // Validate the comment's subject. If not specified, extract
+  // one from the comment's body.
   if (trim($comment_values['subject']) == '') {
-    // The body may be in any format, so:
+    // The body may be in any format, so we:
     // 1) Filter it into HTML
     // 2) Strip out all HTML tags
     // 3) Convert entities back to plain-text.
     // Note: format is checked by check_markup().
-    $comment_values['subject'] = truncate_utf8(trim(decode_entities(strip_tags(check_markup($comment_values['comment'], $comment_values['comment_format'])))), 29, TRUE);
+    $comment_values['subject'] = truncate_utf8(trim(decode_entities(strip_tags(check_markup($comment_values['comment'], $comment_values['format'])))), 29, TRUE);
     // Edge cases where the comment body is populated only by HTML tags will
     // require a default subject.
     if ($comment_values['subject'] == '') {
@@ -1833,32 +1538,15 @@ function _comment_form_submit(&$comment_values) {
  * Process comment form submissions; prepare the comment, store it, and set a redirection target.
  */
 function comment_form_submit($form, &$form_state) {
-  $edit = $form_state['values'];
-  $node = node_load($edit['nid']);
-  _comment_form_submit($edit);
-  if (user_access('post comments') && (user_access('administer comments') || $node->comment == COMMENT_NODE_OPEN)) {
-    $comment = (object) $edit;
-    comment_save($comment);
-    // Explain the approval queue if necessary.
-    if ($comment->status == COMMENT_NOT_PUBLISHED) {
-      if (!user_access('administer comments')) {
-        drupal_set_message(t('Your comment has been queued for review by site administrators and will be published after approval.'));
-      }
-    }
-    else {
-      drupal_set_message(t('Your comment has been posted.'));
-    }
-    $redirect = array('comment/' . $comment->cid, array(), 'comment-' . $comment->cid);
+  _comment_form_submit($form_state['values']);
+  if ($cid = comment_save($form_state['values'])) {
+    $node = node_load($form_state['values']['nid']);
+    // Add 1 to existing $node->comment count to include new comment being added.
+    $comment_count = $node->comment_count + 1;
+    $page = comment_new_page_count($comment_count, 1, $node);
+    $form_state['redirect'] = array('node/'. $node->nid, $page, "comment-$cid");
+    return;
   }
-  else {
-    watchdog('content', 'Comment: unauthorized comment submitted or comment submitted to a closed post %subject.', array('%subject' => $edit['subject']), WATCHDOG_WARNING);
-    drupal_set_message(t('Comment: unauthorized comment submitted or comment submitted to a closed post %subject.', array('%subject' => $edit['subject'])), 'error');
-    $page = comment_new_page_count($node->comment_count, 1, $node);
-    $redirect = array('node/' . $node->nid, $page);
-  }
-
-  // Redirect the user to the node they're commenting on.
-  $form_state['redirect'] = $redirect;
 }
 
 /**
@@ -1875,10 +1563,10 @@ function comment_form_submit($form, &$form_state) {
  * @ingroup themeable
  */
 function theme_comment_view($comment, $node, $links = array(), $visible = TRUE) {
-  $first_new = &drupal_static(__FUNCTION__, TRUE);
-  $comment->new = node_mark($comment->nid, $comment->timestamp);
-  $output = '';
+  static $first_new = TRUE;
 
+  $output = '';
+  $comment->new = node_mark($comment->nid, $comment->timestamp);
   if ($first_new && $comment->new != MARK_READ) {
     // Assign the anchor only for the first new comment. This avoids duplicate
     // id attributes on a page.
@@ -1888,18 +1576,102 @@ function theme_comment_view($comment, $node, $links = array(), $visible = TRUE) 
 
   $output .= "<a id=\"comment-$comment->cid\"></a>\n";
 
-  // Switch to folded/unfolded view of the comment.
+  // Switch to folded/unfolded view of the comment
   if ($visible) {
-    $comment->comment = check_markup($comment->comment, $comment->format, '', FALSE);
-    // Comment API hook.
-    module_invoke_all('comment_view', $comment);
+    $comment->comment = check_markup($comment->comment, $comment->format, FALSE);
+
+    // Comment API hook
+    comment_invoke_comment($comment, 'view');
+
     $output .= theme('comment', $comment, $node, $links);
   }
   else {
-    $output .= theme('comment_folded', $comment, $node);
+    $output .= theme('comment_folded', $comment);
   }
 
   return $output;
+}
+
+
+/**
+ * Build a comment control form.
+ *
+ * @param $mode
+ *   Comment display mode.
+ * @param $order
+ *   Comment order mode.
+ * @param $comments_per_page
+ *   Comments per page.
+ * @ingroup forms
+ */
+function comment_controls(&$form_state, $mode = COMMENT_MODE_THREADED_EXPANDED, $order = COMMENT_ORDER_NEWEST_FIRST, $comments_per_page = 50) {
+  $form['mode'] = array('#type' => 'select',
+    '#default_value' => $mode,
+    '#options' => _comment_get_modes(),
+    '#weight' => 1,
+  );
+  $form['order'] = array(
+    '#type' => 'select',
+    '#default_value' => $order,
+    '#options' => _comment_get_orders(),
+    '#weight' => 2,
+  );
+  foreach (_comment_per_page() as $i) {
+    $options[$i] = t('!a comments per page', array('!a' => $i));
+  }
+  $form['comments_per_page'] = array('#type' => 'select',
+    '#default_value' => $comments_per_page,
+    '#options' => $options,
+    '#weight' => 3,
+  );
+
+  $form['submit'] = array('#type' => 'submit',
+    '#value' => t('Save settings'),
+    '#weight' => 20,
+  );
+
+  return $form;
+}
+
+/**
+ * Theme comment controls box where the user can change the default display mode and display order of comments.
+ *
+ * @param $form
+ *   The form structure.
+ * @ingroup themeable
+ */
+function theme_comment_controls($form) {
+  $output = '<div class="container-inline">';
+  $output .=  drupal_render($form);
+  $output .= '</div>';
+  $output .= '<div class="description">'. t('Select your preferred way to display the comments and click "Save settings" to activate your changes.') .'</div>';
+  return theme('box', t('Comment viewing options'), $output);
+}
+
+/**
+ * Process comment_controls form submissions.
+ */
+function comment_controls_submit($form, &$form_state) {
+  global $user;
+
+  $mode = $form_state['values']['mode'];
+  $order = $form_state['values']['order'];
+  $comments_per_page = $form_state['values']['comments_per_page'];
+
+  if ($user->uid) {
+    $account = user_save($user, array('mode' => $mode, 'sort' => $order, 'comments_per_page' => $comments_per_page));
+    // Terminate if an error occured during user_save().
+    if (!$account) {
+      drupal_set_message(t("Error saving user account."), 'error');
+      return;
+    }
+    $user = $account;
+  }
+  else {
+    $_SESSION['comment_mode'] = $mode;
+    $_SESSION['comment_sort'] = $order;
+    $_SESSION['comment_comments_per_page'] = $comments_per_page;
+  }
 }
 
 /**
@@ -1919,33 +1691,14 @@ function template_preprocess_comment(&$variables) {
   $variables['picture']   = theme_get_setting('toggle_comment_user_picture') ? theme('user_picture', $comment) : '';
   $variables['signature'] = $comment->signature;
   $variables['submitted'] = theme('comment_submitted', $comment);
-  $variables['title']     = l($comment->subject, 'comment/' . $comment->cid, array('fragment' => "comment-$comment->cid"));
-  $variables['template_files'][] = 'comment-' . $node->type;
-  // Set status to a string representation of comment->status.
+  $variables['title']     = l($comment->subject, $_GET['q'], array('fragment' => "comment-$comment->cid"));
+  $variables['template_files'][] = 'comment-'. $node->type;
+  // set status to a string representation of comment->status.
   if (isset($comment->preview)) {
     $variables['status']  = 'comment-preview';
   }
   else {
     $variables['status']  = ($comment->status == COMMENT_NOT_PUBLISHED) ? 'comment-unpublished' : 'comment-published';
-  }
-  // Gather comment classes.
-  if ($comment->uid === 0) {
-    $variables['classes_array'][] = 'comment-by-anonymous';
-  }
-  else {
-    // Published class is not needed. It is either 'comment-preview' or 'comment-unpublished'.
-    if ($variables['status'] != 'comment-published') {
-      $variables['classes_array'][] = $variables['status'];
-    }
-    if ($comment->uid === $variables['node']->uid) {
-      $variables['classes_array'][] = 'comment-by-node-author';
-    }
-    if ($comment->uid === $variables['user']->uid) {
-      $variables['classes_array'][] = 'comment-by-viewer';
-    }
-    if ($comment->new) {
-      $variables['classes_array'][] = 'comment-new';
-    }
   }
 }
 
@@ -1960,26 +1713,20 @@ function template_preprocess_comment_folded(&$variables) {
   $variables['author'] = theme('username', $comment);
   $variables['date']   = format_date($comment->timestamp);
   $variables['new']    = $comment->new ? t('new') : '';
-  $variables['title']  = l($comment->subject, 'comment/' . $comment->cid, array('fragment' => "comment-$comment->cid"));
-  // Gather comment classes.
-  if ($comment->uid === 0) {
-    $variables['classes_array'][] = 'comment-by-anonymous';
-  }
-  else {
-    if ($comment->status == COMMENT_NOT_PUBLISHED) {
-      $variables['classes_array'][] = 'comment-unpublished';
-    }
-    if ($comment->uid === $variables['node']->uid) {
-      $variables['classes_array'][] = 'comment-by-node-author';
-    }
-    if ($comment->uid === $variables['user']->uid) {
-      $variables['classes_array'][] = 'comment-by-viewer';
-    }
-    if ($comment->new) {
-      $variables['classes_array'][] = 'comment-new';
-    }
-  }
+  $variables['title']  = l($comment->subject, comment_node_url() .'/'. $comment->cid, array('fragment' => "comment-$comment->cid"));
+}
 
+/**
+ * Theme comment flat collapsed view.
+ *
+ * @param $comment
+ *   The comment to be themed.
+ * @param $node
+ *   The comment node.
+ * @ingroup themeable
+ */
+function theme_comment_flat_collapsed($comment, $node) {
+  return theme('comment_view', $comment, $node, '', 0);
 }
 
 /**
@@ -1993,6 +1740,19 @@ function template_preprocess_comment_folded(&$variables) {
  */
 function theme_comment_flat_expanded($comment, $node) {
   return theme('comment_view', $comment, $node, module_invoke_all('link', 'comment', $comment, 0));
+}
+
+/**
+ * Theme comment thread collapsed view.
+ *
+ * @param $comment
+ *   The comment to be themed.
+ * @param $node
+ *   The comment node.
+ * @ingroup themeable
+ */
+function theme_comment_thread_collapsed($comment, $node) {
+  return theme('comment_view', $comment, $node, '', 0);
 }
 
 /**
@@ -2017,20 +1777,23 @@ function theme_comment_thread_expanded($comment, $node) {
  */
 function theme_comment_post_forbidden($node) {
   global $user;
+  static $authenticated_post_comments;
 
   if (!$user->uid) {
-    // We only output any link if we are certain, that users get permission
-    // to post comments by logging in. We also locally cache this information.
-    $authenticated_post_comments = &drupal_static(__FUNCTION__, array_key_exists(DRUPAL_AUTHENTICATED_RID, user_roles(TRUE, 'post comments') + user_roles(TRUE, 'post comments without approval')));
+    if (!isset($authenticated_post_comments)) {
+      // We only output any link if we are certain, that users get permission
+      // to post comments by logging in. We also locally cache this information.
+      $authenticated_post_comments = array_key_exists(DRUPAL_AUTHENTICATED_RID, user_roles(TRUE, 'post comments') + user_roles(TRUE, 'post comments without approval'));
+    }
 
     if ($authenticated_post_comments) {
       // We cannot use drupal_get_destination() because these links
       // sometimes appear on /node and taxonomy listing pages.
-      if (variable_get('comment_form_location_' . $node->type, COMMENT_FORM_BELOW) == COMMENT_FORM_SEPARATE_PAGE) {
-        $destination = 'destination=' . rawurlencode("comment/reply/$node->nid#comment-form");
+      if (variable_get('comment_form_location_'. $node->type, COMMENT_FORM_SEPARATE_PAGE) == COMMENT_FORM_SEPARATE_PAGE) {
+        $destination = 'destination='. drupal_urlencode("comment/reply/$node->nid#comment-form");
       }
       else {
-        $destination = 'destination=' . rawurlencode("node/$node->nid#comment-form");
+        $destination = 'destination='. drupal_urlencode("node/$node->nid#comment-form");
       }
 
       if (variable_get('user_register', 1)) {
@@ -2054,7 +1817,9 @@ function theme_comment_post_forbidden($node) {
 function template_preprocess_comment_wrapper(&$variables) {
   // Provide contextual information.
   $variables['display_mode']  = _comment_get_display_setting('mode', $variables['node']);
-  $variables['template_files'][] = 'comment-wrapper-' . $variables['node']->type;
+  $variables['display_order'] = _comment_get_display_setting('sort', $variables['node']);
+  $variables['comment_controls_state'] = variable_get('comment_controls_'. $variables['node']->type, COMMENT_CONTROLS_HIDDEN);
+  $variables['template_files'][] = 'comment-wrapper-'. $variables['node']->type;
 }
 
 /**
@@ -2080,8 +1845,23 @@ function theme_comment_submitted($comment) {
  */
 function _comment_get_modes() {
   return array(
-    COMMENT_MODE_FLAT => t('Flat list'),
-    COMMENT_MODE_THREADED => t('Threaded list')
+    COMMENT_MODE_FLAT_COLLAPSED => t('Flat list - collapsed'),
+    COMMENT_MODE_FLAT_EXPANDED => t('Flat list - expanded'),
+    COMMENT_MODE_THREADED_COLLAPSED => t('Threaded list - collapsed'),
+    COMMENT_MODE_THREADED_EXPANDED => t('Threaded list - expanded')
+  );
+}
+
+/**
+ * Return an array of viewing orders for comment listings.
+ *
+ * We can't use a global variable array because the locale system
+ * is not initialized yet when the comment module is loaded.
+ */
+function _comment_get_orders() {
+  return array(
+    COMMENT_ORDER_NEWEST_FIRST => t('Date - newest first'),
+    COMMENT_ORDER_OLDEST_FIRST => t('Date - oldest first')
   );
 }
 
@@ -2102,15 +1882,40 @@ function _comment_per_page() {
  *   The comment node in question.
  */
 function _comment_get_display_setting($setting, $node) {
-  switch ($setting) {
-    case 'mode':
-      $value = variable_get('comment_default_mode_' . $node->type, COMMENT_MODE_THREADED);
-      break;
+  global $user;
 
-    case 'comments_per_page':
-      $value = variable_get('comment_default_per_page_' . $node->type, 50);
+  if (isset($_GET[$setting])) {
+    $value = $_GET[$setting];
   }
-
+  else {
+    // get the setting's site default
+    switch ($setting) {
+      case 'mode':
+        $default = variable_get('comment_default_mode_'. $node->type, COMMENT_MODE_THREADED_EXPANDED);
+        break;
+      case 'sort':
+        $default = variable_get('comment_default_order_'. $node->type, COMMENT_ORDER_NEWEST_FIRST);
+        break;
+      case 'comments_per_page':
+        $default = variable_get('comment_default_per_page_'. $node->type, 50);
+    }
+    if (variable_get('comment_controls_'. $node->type, COMMENT_CONTROLS_HIDDEN) == COMMENT_CONTROLS_HIDDEN) {
+      // if comment controls are disabled use site default
+      $value = $default;
+    }
+    else {
+      // otherwise use the user's setting if set
+      if (isset($user->$setting) && $user->$setting) {
+        $value = $user->$setting;
+      }
+      else if (isset($_SESSION['comment_'. $setting]) && $_SESSION['comment_'. $setting]) {
+        $value = $_SESSION['comment_'. $setting];
+      }
+      else {
+        $value = $default;
+      }
+    }
+  }
   return $value;
 }
 
@@ -2125,40 +1930,44 @@ function _comment_get_display_setting($setting, $node) {
  * - comment_count: the total number of approved/published comments on this node.
  */
 function _comment_update_node_statistics($nid) {
-  $count = db_query('SELECT COUNT(cid) FROM {comment} WHERE nid = :nid AND status = :status', array(
-    ':nid' => $nid,
-    ':status' => COMMENT_PUBLISHED,
-  ))->fetchField();
+  $count = db_result(db_query('SELECT COUNT(cid) FROM {comments} WHERE nid = %d AND status = %d', $nid, COMMENT_PUBLISHED));
 
+  // comments exist
   if ($count > 0) {
-    // Comments exist.
-    $last_reply = db_query_range('SELECT cid, name, timestamp, uid FROM {comment} WHERE nid = :nid AND status = :status ORDER BY cid DESC', array(
-      ':nid' => $nid,
-      ':status' => COMMENT_PUBLISHED,
-    ), 0, 1)->fetchObject();
-    db_update('node_comment_statistics')
-      ->fields( array(
-        'comment_count' => $count,
-        'last_comment_timestamp' => $last_reply->timestamp,
-        'last_comment_name' => $last_reply->uid ? '' : $last_reply->name,
-        'last_comment_uid' => $last_reply->uid,
-      ))
-      ->condition('nid', $nid)
-      ->execute();
+    $last_reply = db_fetch_object(db_query_range('SELECT cid, name, timestamp, uid FROM {comments} WHERE nid = %d AND status = %d ORDER BY cid DESC', $nid, COMMENT_PUBLISHED, 0, 1));
+    db_query("UPDATE {node_comment_statistics} SET comment_count = %d, last_comment_timestamp = %d, last_comment_name = '%s', last_comment_uid = %d WHERE nid = %d", $count, $last_reply->timestamp, $last_reply->uid ? '' : $last_reply->name, $last_reply->uid, $nid);
   }
+
+  // no comments
   else {
-    // Comments do not exist.
-    $node = db_query('SELECT uid, created FROM {node} WHERE nid = :nid', array(':nid' => $nid))->fetchObject();
-    db_update('node_comment_statistics')
-      ->fields( array(
-        'comment_count' => 0,
-        'last_comment_timestamp' => $node->created,
-        'last_comment_name' => '',
-        'last_comment_uid' => $node->uid,
-      ))
-      ->condition('nid', $nid)
-      ->execute();
+    $node = db_fetch_object(db_query("SELECT uid, created FROM {node} WHERE nid = %d", $nid));
+    db_query("UPDATE {node_comment_statistics} SET comment_count = 0, last_comment_timestamp = %d, last_comment_name = '', last_comment_uid = %d WHERE nid = %d", $node->created, $node->uid, $nid);
   }
+}
+
+/**
+ * Invoke a hook_comment() operation in all modules.
+ *
+ * @param &$comment
+ *   A comment object.
+ * @param $op
+ *   A string containing the name of the comment operation.
+ * @return
+ *   The returned value of the invoked hooks.
+ */
+function comment_invoke_comment(&$comment, $op) {
+  $return = array();
+  foreach (module_implements('comment') as $name) {
+    $function = $name .'_comment';
+    $result = $function($comment, $op);
+    if (isset($result) && is_array($result)) {
+      $return = array_merge($return, $result);
+    }
+    else if (isset($result)) {
+      $return[] = $result;
+    }
+  }
+  return $return;
 }
 
 /**
@@ -2177,7 +1986,6 @@ function _comment_update_node_statistics($nid) {
 function int2vancode($i = 0) {
   $num = base_convert((int)$i, 10, 36);
   $length = strlen($num);
-
   return chr($length + ord('0') - 1) . $num;
 }
 
@@ -2189,7 +1997,7 @@ function vancode2int($c = '00') {
 }
 
 /**
- * Implement hook_hook_info().
+ * Implementation of hook_hook_info().
  */
 function comment_hook_info() {
   return array(
@@ -2213,7 +2021,7 @@ function comment_hook_info() {
 }
 
 /**
- * Implement hook_action_info().
+ * Implementation of hook_action_info().
  */
 function comment_action_info() {
   return array(
@@ -2251,12 +2059,9 @@ function comment_unpublish_action($comment, $context = array()) {
   }
   else {
     $cid = $context['cid'];
-    $subject = db_query('SELECT subject FROM {comment} WHERE cid = :cid', array(':cid', $cid))->fetchField();
+    $subject = db_result(db_query("SELECT subject FROM {comments} WHERE cid = %d", $cid));
   }
-  db_update('comment')
-    ->fields(array('status' => COMMENT_NOT_PUBLISHED))
-    ->condition('cid', $cid)
-    ->execute();
+  db_query('UPDATE {comments} SET status = %d WHERE cid = %d', COMMENT_NOT_PUBLISHED, $cid);
   watchdog('action', 'Unpublished comment %subject.', array('%subject' => $subject));
 }
 
@@ -2269,10 +2074,9 @@ function comment_unpublish_by_keyword_action_form($context) {
   $form['keywords'] = array(
     '#title' => t('Keywords'),
     '#type' => 'textarea',
-    '#description' => t('The comment will be unpublished if it contains any of the phrases above. Use a case-sensitive, comma-separated list of phrases. Example: funny, bungee jumping, "Company, Inc."'),
+    '#description' => t('The comment will be unpublished if it contains any of the character sequences above. Use a comma-separated list of character sequences. Example: funny, bungee jumping, "Company, Inc.". Character sequences are case-sensitive.'),
     '#default_value' => isset($context['keywords']) ? drupal_implode_tags($context['keywords']) : '',
   );
-
   return $form;
 }
 
@@ -2284,49 +2088,22 @@ function comment_unpublish_by_keyword_action_submit($form, $form_state) {
 }
 
 /**
- * Implement a configurable Drupal action.
- *
+ * Implementation of a configurable Drupal action.
  * Unpublish a comment if it contains a certain string.
  *
  * @param $context
  *   An array providing more information about the context of the call to this action.
- *   Unused here, since this action currently only supports the insert and update ops of
+ *   Unused here since this action currently only supports the insert and update ops of
  *   the comment hook, both of which provide a complete $comment object.
  * @param $comment
  *   A comment object.
  */
 function comment_unpublish_by_keyword_action($comment, $context) {
   foreach ($context['keywords'] as $keyword) {
-    if (strpos($comment->comment, $keyword) !== FALSE || strpos($comment->subject, $keyword) !== FALSE) {
-      db_update('comment')
-        ->fields(array('status' => COMMENT_NOT_PUBLISHED))
-        ->condition('cid', $comment->cid)
-        ->execute();
+    if (strstr($comment->comment, $keyword) || strstr($comment->subject, $keyword)) {
+      db_query('UPDATE {comments} SET status = %d WHERE cid = %d', COMMENT_NOT_PUBLISHED, $comment->cid);
       watchdog('action', 'Unpublished comment %subject.', array('%subject' => $comment->subject));
       break;
     }
   }
-}
-
-/**
- * Implement hook_ranking().
- */
-function comment_ranking() {
-  return array(
-    'comments' => array(
-      'title' => t('Number of comments'),
-      'join' => 'LEFT JOIN {node_comment_statistics} node_comment_statistics ON node_comment_statistics.nid = i.sid',
-      // Inverse law that maps the highest reply count on the site to 1 and 0 to 0.
-      'score' => '2.0 - 2.0 / (1.0 + node_comment_statistics.comment_count * CAST(%f AS DECIMAL))',
-      'arguments' => array(variable_get('node_cron_comments_scale', 0)),
-    ),
-  );
-}
-
-/**
- * Implement hook_menu_alter().
- */
-function comment_menu_alter(&$items) {
-  // Add comments to the description for admin/content/content.
-  $items['admin/content/content']['description'] = "View, edit, and delete your site's content and comments.";
 }

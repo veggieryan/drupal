@@ -1,5 +1,4 @@
-// $Id: ahah.js,v 1.15 2009/04/27 20:19:35 webchick Exp $
-(function ($) {
+// $Id: ahah.js,v 1.7.2.1 2008/02/11 14:46:27 goba Exp $
 
 /**
  * Provides AJAX-like page updating via AHAH (Asynchronous HTML and HTTP).
@@ -16,19 +15,17 @@
 /**
  * Attaches the ahah behavior to each ahah form element.
  */
-Drupal.behaviors.ahah = {
-  attach: function (context, settings) {
-    for (var base in settings.ahah) {
-      if (!$('#' + base + '.ahah-processed').size()) {
-        var element_settings = settings.ahah[base];
+Drupal.behaviors.ahah = function(context) {
+  for (var base in Drupal.settings.ahah) {
+    if (!$('#'+ base + '.ahah-processed').size()) {
+      var element_settings = Drupal.settings.ahah[base];
 
-        $(element_settings.selector).each(function () {
-          element_settings.element = this;
-          var ahah = new Drupal.ahah(base, element_settings);
-        });
+      $(element_settings.selector).each(function() {
+        element_settings.element = this;
+        var ahah = new Drupal.ahah(base, element_settings);
+      });
 
-        $('#' + base).addClass('ahah-processed');
-      }
+      $('#'+ base).addClass('ahah-processed');
     }
   }
 };
@@ -36,14 +33,14 @@ Drupal.behaviors.ahah = {
 /**
  * AHAH object.
  */
-Drupal.ahah = function (base, element_settings) {
+Drupal.ahah = function(base, element_settings) {
   // Set the properties for this object.
   this.element = element_settings.element;
   this.selector = element_settings.selector;
   this.event = element_settings.event;
   this.keypress = element_settings.keypress;
   this.url = element_settings.url;
-  this.wrapper = '#' + element_settings.wrapper;
+  this.wrapper = '#'+ element_settings.wrapper;
   this.effect = element_settings.effect;
   this.method = element_settings.method;
   this.progress = element_settings.progress;
@@ -77,18 +74,18 @@ Drupal.ahah = function (base, element_settings) {
   var options = {
     url: ahah.url,
     data: ahah.button,
-    beforeSubmit: function (form_values, element_settings, options) {
+    beforeSubmit: function(form_values, element_settings, options) {
       return ahah.beforeSubmit(form_values, element_settings, options);
     },
-    success: function (response, status) {
+    success: function(response, status) {
       // Sanity check for browser support (object expected).
       // When using iFrame uploads, responses must be returned as a string.
-      if (typeof response == 'string') {
+      if (typeof(response) == 'string') {
         response = Drupal.parseJson(response);
       }
       return ahah.success(response, status);
     },
-    complete: function (response, status) {
+    complete: function(response, status) {
       if (status == 'error' || status == 'parsererror') {
         return ahah.error(response, ahah.url);
       }
@@ -98,7 +95,7 @@ Drupal.ahah = function (base, element_settings) {
   };
 
   // Bind the ajaxSubmit function to the element event.
-  $(element_settings.element).bind(element_settings.event, function () {
+  $(element_settings.element).bind(element_settings.event, function() {
     $(element_settings.element).parents('form').ajaxSubmit(options);
     return false;
   });
@@ -106,7 +103,7 @@ Drupal.ahah = function (base, element_settings) {
   // can be triggered through keyboard input as well as e.g. a mousedown
   // action.
   if (element_settings.keypress) {
-    $(element_settings.element).keypress(function (event) {
+    $(element_settings.element).keypress(function(event) {
       // Detect enter key.
       if (event.keyCode == 13) {
         $(element_settings.element).trigger(element_settings.event);
@@ -139,7 +136,7 @@ Drupal.ahah.prototype.beforeSubmit = function (form_values, element, options) {
   else if (this.progress.type == 'throbber') {
     this.progress.element = $('<div class="ahah-progress ahah-progress-throbber"><div class="throbber">&nbsp;</div></div>');
     if (this.progress.message) {
-      $('.throbber', this.progress.element).after('<div class="message">' + this.progress.message + '</div>');
+      $('.throbber', this.progress.element).after('<div class="message">' + this.progress.message + '</div>')
     }
     $(this.element).after(this.progress.element);
   }
@@ -184,11 +181,15 @@ Drupal.ahah.prototype.success = function (response, status) {
   }
 
   // Determine what effect use and what content will receive the effect, then
-  // show the new content.
-  if ($('.ahah-new-content', new_content).size() > 0) {
+  // show the new content. For browser compatibility, Safari is excluded from
+  // using effects on table rows.
+  if (($.browser.safari && $("tr.ahah-new-content", new_content).size() > 0)) {
+    new_content.show();
+  }
+  else if ($('.ahah-new-content', new_content).size() > 0) {
     $('.ahah-new-content', new_content).hide();
     new_content.show();
-    $('.ahah-new-content', new_content)[this.showEffect](this.showSpeed);
+    $(".ahah-new-content", new_content)[this.showEffect](this.showSpeed);
   }
   else if (this.showEffect != 'show') {
     new_content[this.showEffect](this.showSpeed);
@@ -209,7 +210,7 @@ Drupal.ahah.prototype.success = function (response, status) {
 Drupal.ahah.prototype.error = function (response, uri) {
   alert(Drupal.ahahError(response, uri));
   // Resore the previous action and target to the form.
-  $(this.element).parent('form').attr({ action: this.form_action, target: this.form_target });
+  $(this.element).parent('form').attr( { action: this.form_action, target: this.form_target} );
   // Remove the progress element.
   if (this.progress.element) {
     $(this.progress.element).remove();
@@ -220,7 +221,5 @@ Drupal.ahah.prototype.error = function (response, uri) {
   // Undo hide.
   $(this.wrapper).show();
   // Re-enable the element.
-  $(this.element).removeClass('progress-disabled').attr('disabled', false);
+  $(this.element).removeClass('progess-disabled').attr('disabled', false);
 };
-
-})(jQuery);

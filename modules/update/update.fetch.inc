@@ -1,5 +1,5 @@
 <?php
-// $Id: update.fetch.inc,v 1.22 2009/07/03 19:21:55 dries Exp $
+// $Id: update.fetch.inc,v 1.7.2.6 2009/06/09 11:08:32 goba Exp $
 
 /**
  * @file
@@ -23,8 +23,8 @@ function update_manual_status() {
  * Fetch project info via XML from a central server.
  */
 function _update_refresh() {
+  static $fail = array();
   global $base_url;
-  $fail = &drupal_static(__FUNCTION__, array());
   module_load_include('inc', 'update', 'update.compare');
 
   // Since we're fetching new available update data, we want to clear
@@ -45,9 +45,8 @@ function _update_refresh() {
   // available release data, since even if we fail to fetch new data, we need
   // to clear out the stale data at this point.
   _update_cache_clear('update_available_releases');
-
-   $max_fetch_attempts = variable_get('update_max_fetch_attempts', UPDATE_MAX_FETCH_ATTEMPTS);
-
+  $max_fetch_attempts = variable_get('update_max_fetch_attempts', UPDATE_MAX_FETCH_ATTEMPTS);
+  
   foreach ($projects as $key => $project) {
     $url = _update_build_fetch_url($project, $site_key);
     $fetch_url_base = _update_get_fetch_url_base($project);
@@ -68,7 +67,8 @@ function _update_refresh() {
   }
 
   if ($data) {
-    $available = update_parse_xml($data);
+    $parser = new update_xml_parser;
+    $available = $parser->parse($data);
   }
   if (!empty($available) && is_array($available)) {
     // Record the projects where we failed to fetch data.
@@ -78,14 +78,14 @@ function _update_refresh() {
       }
     }
     $frequency = variable_get('update_check_frequency', 1);
-    _update_cache_set('update_available_releases', $available, REQUEST_TIME + (60 * 60 * 24 * $frequency));
+    _update_cache_set('update_available_releases', $available, time() + (60 * 60 * 24 * $frequency));
     watchdog('update', 'Attempted to fetch information about all available new releases and updates.', array(), WATCHDOG_NOTICE, l(t('view'), 'admin/reports/updates'));
   }
   else {
     watchdog('update', 'Unable to fetch any information about available new releases and updates.', array(), WATCHDOG_ERROR, l(t('view'), 'admin/reports/updates'));
   }
   // Whether this worked or not, we did just (try to) check for updates.
-  variable_set('update_last_check', REQUEST_TIME);
+  variable_set('update_last_check', time());
   return $available;
 }
 
@@ -107,17 +107,17 @@ function _update_refresh() {
 function _update_build_fetch_url($project, $site_key = '') {
   $name = $project['name'];
   $url = _update_get_fetch_url_base($project);
-  $url .= '/' . $name . '/' . DRUPAL_CORE_COMPATIBILITY;
+  $url .= '/'. $name .'/'. DRUPAL_CORE_COMPATIBILITY;
   // Only append a site_key and the version information if we have a site_key
   // in the first place, and if this is not a disabled module or theme. We do
   // not want to record usage statistics for disabled code.
   if (!empty($site_key) && (strpos($project['project_type'], 'disabled') === FALSE)) {
     $url .= (strpos($url, '?') === TRUE) ? '&' : '?';
     $url .= 'site_key=';
-    $url .= rawurlencode($site_key);
+    $url .= drupal_urlencode($site_key);
     if (!empty($project['info']['version'])) {
       $url .= '&version=';
-      $url .= rawurlencode($project['info']['version']);
+      $url .= drupal_urlencode($project['info']['version']);
     }
   }
   return $url;
@@ -149,12 +149,12 @@ function _update_get_fetch_url_base($project) {
  * @see update_requirements()
  */
 function _update_cron_notify() {
-  include_once DRUPAL_ROOT . '/includes/install.inc';
+  include_once './includes/install.inc';
   $status = update_requirements('runtime');
   $params = array();
   $notify_all = (variable_get('update_notification_threshold', 'all') == 'all');
   foreach (array('core', 'contrib') as $report_type) {
-    $type = 'update_' . $report_type;
+    $type = 'update_'. $report_type;
     if (isset($status[$type]['severity'])
         && ($status[$type]['severity'] == REQUIREMENT_ERROR || ($notify_all && $status[$type]['reason'] == UPDATE_NOT_CURRENT))) {
       $params[$report_type] = $status[$type]['reason'];
@@ -165,7 +165,7 @@ function _update_cron_notify() {
     if (!empty($notify_list)) {
       $default_language = language_default();
       foreach ($notify_list as $target) {
-        if ($target_user = user_load_by_mail($target)) {
+        if ($target_user = user_load(array('mail' => $target))) {
           $target_language = user_preferred_language($target_user);
         }
         else {
@@ -178,40 +178,96 @@ function _update_cron_notify() {
 }
 
 /**
- * Parse the XML of the Drupal release history info files.
- *
- * @param $raw_xml_list
- *   Array of raw XML strings, one for each fetched project.
- *
- * @return
- *   Nested array of parsed data about projects and releases.
+ * XML Parser object to read Drupal's release history info files.
+ * This uses PHP4's lame XML parsing, but it works.
  */
-function update_parse_xml($raw_xml_list) {
-  $data = array();
-  foreach ($raw_xml_list as $raw_xml) {
-    $xml = new SimpleXMLElement($raw_xml);
-    $short_name = (string)$xml->short_name;
-    $data[$short_name] = array();
-    foreach ($xml as $k => $v) {
-      $data[$short_name][$k] = (string)$v;
+class update_xml_parser {
+  var $projects = array();
+  var $current_project;
+  var $current_release;
+  var $current_term;
+  var $current_tag;
+  var $current_object;
+
+  /**
+   * Parse an array of XML data files.
+   */
+  function parse($data) {
+    foreach ($data as $datum) {
+      $parser = xml_parser_create();
+      xml_set_object($parser, $this);
+      xml_set_element_handler($parser, 'start', 'end');
+      xml_set_character_data_handler($parser, "data");
+      xml_parse($parser, $datum);
+      xml_parser_free($parser);
     }
-    $data[$short_name]['releases'] = array();
-    foreach ($xml->releases->children() as $release) {
-      $version = (string)$release->version;
-      $data[$short_name]['releases'][$version] = array();
-      foreach ($release->children() as $k => $v) {
-        $data[$short_name]['releases'][$version][$k] = (string)$v;
-      }
-      $data[$short_name]['releases'][$version]['terms'] = array();
-      if ($release->terms) {
-        foreach ($release->terms->children() as $term) {
-          if (!isset($data[$short_name]['releases'][$version]['terms'][(string)$term->name])) {
-            $data[$short_name]['releases'][$version]['terms'][(string)$term->name] = array();
-          }
-          $data[$short_name]['releases'][$version]['terms'][(string)$term->name][] = (string)$term->value;
+    return $this->projects;
+  }
+
+  function start($parser, $name, $attr) {
+    $this->current_tag = $name;
+    switch ($name) {
+      case 'PROJECT':
+        unset($this->current_object);
+        $this->current_project = array();
+        $this->current_object = &$this->current_project;
+        break;
+      case 'RELEASE':
+        unset($this->current_object);
+        $this->current_release = array();
+        $this->current_object = &$this->current_release;
+        break;
+      case 'TERM':
+        unset($this->current_object);
+        $this->current_term = array();
+        $this->current_object = &$this->current_term;
+        break;
+    }
+  }
+
+  function end($parser, $name) {
+    switch ($name) {
+      case 'PROJECT':
+        unset($this->current_object);
+        $this->projects[$this->current_project['short_name']] = $this->current_project;
+        $this->current_project = array();
+        break;
+      case 'RELEASE':
+        unset($this->current_object);
+        $this->current_project['releases'][$this->current_release['version']] = $this->current_release;
+        break;
+      case 'RELEASES':
+        $this->current_object = &$this->current_project;
+        break;
+      case 'TERM':
+        unset($this->current_object);
+        $term_name = $this->current_term['name'];
+        if (!isset($this->current_release['terms'])) {
+          $this->current_release['terms'] = array();
         }
+        if (!isset($this->current_release['terms'][$term_name])) {
+          $this->current_release['terms'][$term_name] = array();
+        }
+        $this->current_release['terms'][$term_name][] = $this->current_term['value'];
+        break;
+      case 'TERMS':
+        $this->current_object = &$this->current_release;
+        break;
+      default:
+        $this->current_object[strtolower($this->current_tag)] = trim($this->current_object[strtolower($this->current_tag)]);
+        $this->current_tag = '';
+    }
+  }
+
+  function data($parser, $data) {
+    if ($this->current_tag && !in_array($this->current_tag, array('PROJECT', 'RELEASE', 'RELEASES', 'TERM', 'TERMS'))) {
+      $tag = strtolower($this->current_tag);
+      if (isset($this->current_object[$tag])) {
+        $this->current_object[$tag] .= $data;
+      }
+      else {
+        $this->current_object[$tag] = $data;
       }
     }
   }
-  return $data;
 }

@@ -1,4 +1,4 @@
-/* $Id: node.css,v 1.7 2009/03/30 03:15:40 webchick Exp $ */
+/* $Id: node.css,v 1.5 2008/01/25 21:21:44 goba Exp $ */
 
 .node-unpublished {
   background-color: #fff4f4;
@@ -42,4 +42,3 @@ td.revision-current {
 .terms-inline {
   display: inline;
 }
-

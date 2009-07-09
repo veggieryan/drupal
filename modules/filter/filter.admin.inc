@@ -1,5 +1,5 @@
 <?php
-// $Id: filter.admin.inc,v 1.30 2009/06/12 08:39:37 dries Exp $
+// $Id: filter.admin.inc,v 1.8.2.1 2008/02/12 14:25:34 goba Exp $
 
 /**
  * @file
@@ -7,7 +7,7 @@
  */
 
 /**
- * Menu callback; Displays a list of all text formats and which
+ * Menu callback; Displays a list of all input formats and which
  * one is the default.
  *
  * @ingroup forms
@@ -19,25 +19,23 @@ function filter_admin_overview() {
   $formats = filter_formats();
   $error = FALSE;
 
-  $form = array('#tree' => TRUE);
   foreach ($formats as $id => $format) {
     $roles = array();
     foreach (user_roles() as $rid => $name) {
       // Prepare a roles array with roles that may access the filter.
-      if (strpos($format->roles, ",$rid,") !== FALSE) {
+      if (strstr($format->roles, ",$rid,")) {
         $roles[] = $name;
       }
     }
     $default = ($id == variable_get('filter_default_format', 1));
     $options[$id] = '';
-    $form[$id]['name'] = array('#markup' => $format->name);
-    $form[$id]['roles'] = array('#markup' => $default ? t('All roles may use the default format') : ($roles ? implode(', ', $roles) : t('No roles may use this format')));
-    $form[$id]['configure'] = array('#markup' => l(t('configure'), 'admin/settings/formats/' . $id));
-    $form[$id]['delete'] = array('#markup' => $default ? '' : l(t('delete'), 'admin/settings/formats/delete/' . $id));
-    $form[$id]['weight'] = array('#type' => 'weight', '#default_value' => $format->weight);
+    $form[$format->name]['id'] = array('#value' => $id);
+    $form[$format->name]['roles'] = array('#value' => $default ? t('All roles may use default format') : ($roles ? implode(', ', $roles) : t('No roles may use this format')));
+    $form[$format->name]['configure'] = array('#value' => l(t('configure'), 'admin/settings/filters/'. $id));
+    $form[$format->name]['delete'] = array('#value' => $default ? '' : l(t('delete'), 'admin/settings/filters/delete/'. $id));
   }
   $form['default'] = array('#type' => 'radios', '#options' => $options, '#default_value' => variable_get('filter_default_format', 1));
-  $form['submit'] = array('#type' => 'submit', '#value' => t('Save changes'));
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Set default format'));
   return $form;
 }
 
@@ -47,16 +45,6 @@ function filter_admin_overview_submit($form, &$form_state) {
     drupal_set_message(t('Default format updated.'));
     variable_set('filter_default_format', $form_state['values']['default']);
   }
-  foreach ($form_state['values'] as $id => $data) {
-    if (is_array($data) && isset($data['weight'])) {
-      // Only update if this is a form element with weight.
-      db_update('filter_format')
-        ->fields(array('weight' => $data['weight']))
-        ->condition('format', $id)
-        ->execute();
-    }
-  }
-  drupal_set_message(t('The text format ordering has been saved.'));
 }
 
 /**
@@ -66,45 +54,38 @@ function filter_admin_overview_submit($form, &$form_state) {
  */
 function theme_filter_admin_overview($form) {
   $rows = array();
-  foreach ($form as $id => $element) {
+  foreach ($form as $name => $element) {
     if (isset($element['roles']) && is_array($element['roles'])) {
-      $element['weight']['#attributes']['class'] = 'text-format-order-weight';
       $rows[] = array(
-        'data' => array(
-          check_plain($element['name']['#markup']),
-          drupal_render($element['roles']),
-          drupal_render($form['default'][$id]),
-          drupal_render($element['weight']),
-          drupal_render($element['configure']),
-          drupal_render($element['delete']),
-        ),
-        'class' => 'draggable',
+        drupal_render($form['default'][$element['id']['#value']]),
+        check_plain($name),
+        drupal_render($element['roles']),
+        drupal_render($element['configure']),
+        drupal_render($element['delete'])
       );
-      unset($form[$id]);
+      unset($form[$name]);
     }
   }
-  $header = array(t('Name'), t('Roles'), t('Default'), t('Weight'), array('data' => t('Operations'), 'colspan' => 2));
-  $output = theme('table', $header, $rows, array('id' => 'text-format-order'));
-  $output .= drupal_render_children($form);
-
-  drupal_add_tabledrag('text-format-order', 'order', 'sibling', 'text-format-order-weight');
+  $header = array(t('Default'), t('Name'), t('Roles'), array('data' => t('Operations'), 'colspan' => 2));
+  $output = theme('table', $header, $rows);
+  $output .= drupal_render($form);
 
   return $output;
 }
 
 /**
- * Menu callback; Display a text format form.
+ * Menu callback; Display a filter format form.
  */
 function filter_admin_format_page($format = NULL) {
   if (!isset($format->name)) {
-    drupal_set_title(t('Add text format'), PASS_THROUGH);
+    drupal_set_title(t("Add input format"));
     $format = (object)array('name' => '', 'roles' => '', 'format' => '');
   }
   return drupal_get_form('filter_admin_format_form', $format);
 }
 
 /**
- * Generate a text format form.
+ * Generate a filter format form.
  *
  * @ingroup forms
  * @see filter_admin_format_form_validate()
@@ -120,19 +101,19 @@ function filter_admin_format_form(&$form_state, $format) {
   $form['name'] = array('#type' => 'textfield',
     '#title' => t('Name'),
     '#default_value' => $format->name,
-    '#description' => t('Specify a unique name for this text format.'),
+    '#description' => t('Specify a unique name for this filter format.'),
     '#required' => TRUE,
   );
 
   // Add a row of checkboxes for form group.
   $form['roles'] = array('#type' => 'fieldset',
     '#title' => t('Roles'),
-    '#description' => $default ? $help : t('Choose which roles may use this text format. Note that roles with the "administer filters" permission can always use all text formats.'),
+    '#description' => $default ? $help : t('Choose which roles may use this filter format. Note that roles with the "administer filters" permission can always use all the filter formats.'),
     '#tree' => TRUE,
   );
 
   foreach (user_roles() as $rid => $name) {
-    $checked = strpos($format->roles, ",$rid,") !== FALSE;
+    $checked = strstr($format->roles, ",$rid,");
     $form['roles'][$rid] = array('#type' => 'checkbox',
       '#title' => $name,
       '#default_value' => ($default || $checked),
@@ -147,7 +128,7 @@ function filter_admin_format_form(&$form_state, $format) {
 
   $form['filters'] = array('#type' => 'fieldset',
     '#title' => t('Filters'),
-    '#description' => t('Choose the filters that will be used in this text format.'),
+    '#description' => t('Choose the filters that will be used in this filter format.'),
     '#tree' => TRUE,
   );
   foreach ($all as $id => $filter) {
@@ -162,16 +143,14 @@ function filter_admin_format_form(&$form_state, $format) {
 
     // Composition tips (guidelines)
     $tips = _filter_tips($format->format, FALSE);
-    $tiplist = theme('filter_tips', $tips, FALSE);
+    $extra = '<p>'. l(t('More information about formatting options'), 'filter/tips') .'</p>';
+    $tiplist = theme('filter_tips', $tips, FALSE, $extra);
     if (!$tiplist) {
-      $tiplist = '<p>' . t('No guidelines available.') . '</p>';
+      $tiplist = '<p>'. t('No guidelines available.') .'</p>';
     }
-    else {
-      $tiplist .= theme('filter_tips_more_info');
-    }
-    $group = '<p>' . t('These are the guidelines that users will see for posting in this text format. They are automatically generated from the filter settings.') . '</p>';
+    $group = '<p>'. t('These are the guidelines that users will see for posting in this input format. They are automatically generated from the filter settings.') .'</p>';
     $group .= $tiplist;
-    $form['tips'] = array('#markup' => '<h2>' . t('Formatting guidelines') . '</h2>' . $group);
+    $form['tips'] = array('#value' => '<h2>'. t('Formatting guidelines') .'</h2>'. $group);
   }
   $form['submit'] = array('#type' => 'submit', '#value' => t('Save configuration'));
 
@@ -179,20 +158,20 @@ function filter_admin_format_form(&$form_state, $format) {
 }
 
 /**
- * Validate text format form submissions.
+ * Validate filter format form submissions.
  */
 function filter_admin_format_form_validate($form, &$form_state) {
   if (!isset($form_state['values']['format'])) {
     $name = trim($form_state['values']['name']);
-    $result = db_query("SELECT format FROM {filter_format} WHERE name = :name", array(':name' => $name))->fetchField();
+    $result = db_fetch_object(db_query("SELECT format FROM {filter_formats} WHERE name='%s'", $name));
     if ($result) {
-      form_set_error('name', t('Text format names must be unique. A format named %name already exists.', array('%name' => $name)));
+      form_set_error('name', t('Filter format names need to be unique. A format named %name already exists.', array('%name' => $name)));
     }
   }
 }
 
 /**
- * Process text format form submissions.
+ * Process filter format form submissions.
  */
 function filter_admin_format_form_submit($form, &$form_state) {
   $format = isset($form_state['values']['format']) ? $form_state['values']['format'] : NULL;
@@ -200,37 +179,28 @@ function filter_admin_format_form_submit($form, &$form_state) {
   $name = trim($form_state['values']['name']);
   $cache = TRUE;
 
-  // Add a new text format.
+  // Add a new filter format.
   if (!$format) {
     $new = TRUE;
-    db_insert('filter_format')
-      ->fields(array('name' => $name))
-      ->execute();
-    $format = db_query("SELECT MAX(format) AS format FROM {filter_format}")->fetchField();
-    drupal_set_message(t('Added text format %format.', array('%format' => $name)));
+    db_query("INSERT INTO {filter_formats} (name) VALUES ('%s')", $name);
+    $format = db_result(db_query("SELECT MAX(format) AS format FROM {filter_formats}"));
+    drupal_set_message(t('Added input format %format.', array('%format' => $name)));
   }
   else {
-    drupal_set_message(t('The text format settings have been updated.'));
+    drupal_set_message(t('The input format settings have been updated.'));
   }
-  db_delete('filter')
-    ->condition('format', $format)
-    ->execute();
-  $query = db_insert('filter')->fields(array('format', 'module', 'delta', 'weight'));
+
+  db_query("DELETE FROM {filters} WHERE format = %d", $format);
   foreach ($form_state['values']['filters'] as $id => $checked) {
     if ($checked) {
       list($module, $delta) = explode('/', $id);
       // Add new filters to the bottom.
       $weight = isset($current[$id]->weight) ? $current[$id]->weight : 10;
-      $query->values(array(
-        'format' => $format,
-        'module' => $module,
-        'delta'  => $delta,
-        'weight' => $weight,
-      ));
+      db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, '%s', %d, %d)", $format, $module, $delta, $weight);
+
       // Check if there are any 'no cache' filters.
       $cache &= !module_invoke($module, 'filter', 'no cache', $delta);
     }
-    $query->execute();
   }
 
   // We store the roles as a string for ease of use.
@@ -245,27 +215,20 @@ function filter_admin_format_form_submit($form, &$form_state) {
     }
   }
   if (!empty($form_state['values']['default_format'])) {
-    $roles = ',' . implode(',', array_keys(user_roles())) . ',';
+    $roles = ','. implode(',', array_keys(user_roles())) .',';
   }
   else {
-    $roles = ',' . implode(',', $roles) . ',';
+    $roles = ','. implode(',', $roles) .',';
   }
 
-  db_update('filter_format')
-    ->fields(array(
-      'cache' => $cache,
-      'name'  => $name,
-      'roles' => $roles,
-    ))
-    ->condition('format', $format)
-    ->execute();
+  db_query("UPDATE {filter_formats} SET cache = %d, name='%s', roles = '%s' WHERE format = %d", $cache, $name, $roles, $format);
 
-  cache_clear_all($format . ':', 'cache_filter', TRUE);
+  cache_clear_all($format .':', 'cache_filter', TRUE);
 
   // If a new filter was added, return to the main list of filters. Otherwise, stay on edit filter page to show new changes.
-  $return = 'admin/settings/formats';
+  $return = 'admin/settings/filters';
   if (!empty($new)) {
-    $return .= '/' . $format;
+    $return .= '/'. $format;
   }
   $form_state['redirect'] = $return;
   return;
@@ -279,18 +242,18 @@ function filter_admin_format_form_submit($form, &$form_state) {
  */
 function filter_admin_delete() {
   $format = arg(4);
-  $format = db_query('SELECT * FROM {filter_format} WHERE format = :format', array(':format' => $format))->fetchObject();
+  $format = db_fetch_object(db_query('SELECT * FROM {filter_formats} WHERE format = %d', $format));
 
   if ($format) {
     if ($format->format != variable_get('filter_default_format', 1)) {
       $form['format'] = array('#type' => 'hidden', '#value' => $format->format);
       $form['name'] = array('#type' => 'hidden', '#value' => $format->name);
 
-      return confirm_form($form, t('Are you sure you want to delete the text format %format?', array('%format' => $format->name)), 'admin/settings/formats', t('If you have any content left in this text format, it will be switched to the default text format. This action cannot be undone.'), t('Delete'), t('Cancel'));
+      return confirm_form($form, t('Are you sure you want to delete the input format %format?', array('%format' => $format->name)), 'admin/settings/filters', t('If you have any content left in this input format, it will be switched to the default input format. This action cannot be undone.'), t('Delete'), t('Cancel'));
     }
     else {
       drupal_set_message(t('The default format cannot be deleted.'));
-      drupal_goto('admin/settings/formats');
+      drupal_goto('admin/settings/filters');
     }
   }
   else {
@@ -302,32 +265,19 @@ function filter_admin_delete() {
  * Process filter delete form submission.
  */
 function filter_admin_delete_submit($form, &$form_state) {
-  db_delete('filter_format')
-    ->condition('format', $form_state['values']['format'])
-    ->execute();
-  db_delete('filter')
-    ->condition('format', $form_state['values']['format'])
-    ->execute();
+  db_query("DELETE FROM {filter_formats} WHERE format = %d", $form_state['values']['format']);
+  db_query("DELETE FROM {filters} WHERE format = %d", $form_state['values']['format']);
 
   $default = variable_get('filter_default_format', 1);
   // Replace existing instances of the deleted format with the default format.
-  if (db_table_exists('comment')) {
-    db_update('comment')
-      ->fields(array('format' => $default))
-      ->condition('format', $form_state['values']['format'])
-      ->execute();
-  }
-  if (db_table_exists('box')) {
-    db_update('box')
-      ->fields(array('format' => $default))
-      ->condition('format', $form_state['values']['format'])
-      ->execute();
-  }
+  db_query("UPDATE {node_revisions} SET format = %d WHERE format = %d", $default, $form_state['values']['format']);
+  db_query("UPDATE {comments} SET format = %d WHERE format = %d", $default, $form_state['values']['format']);
+  db_query("UPDATE {boxes} SET format = %d WHERE format = %d", $default, $form_state['values']['format']);
 
-  cache_clear_all($form_state['values']['format'] . ':', 'cache_filter', TRUE);
-  drupal_set_message(t('Deleted text format %format.', array('%format' => $form_state['values']['name'])));
+  cache_clear_all($form_state['values']['format'] .':', 'cache_filter', TRUE);
+  drupal_set_message(t('Deleted input format %format.', array('%format' => $form_state['values']['name'])));
 
-  $form_state['redirect'] = 'admin/settings/formats';
+  $form_state['redirect'] = 'admin/settings/filters';
   return;
 }
 
@@ -336,7 +286,7 @@ function filter_admin_delete_submit($form, &$form_state) {
  * Menu callback; display settings defined by a format's filters.
  */
 function filter_admin_configure_page($format) {
-  drupal_set_title(t("Configure %format", array('%format' => $format->name)), PASS_THROUGH);
+  drupal_set_title(t("Configure %format", array('%format' => $format->name)));
   return drupal_get_form('filter_admin_configure', $format);
 }
 
@@ -356,10 +306,10 @@ function filter_admin_configure(&$form_state, $format) {
   }
 
   if (!empty($form)) {
-    $form = system_settings_form($form, TRUE);
+    $form = system_settings_form($form);
   }
   else {
-    $form['error'] = array('#markup' => t('No settings are available.'));
+    $form['error'] = array('#value' => t('No settings are available.'));
   }
   $form['format'] = array('#type' => 'hidden', '#value' => $format->format);
   $form['#submit'][] = 'filter_admin_configure_submit';
@@ -370,14 +320,14 @@ function filter_admin_configure(&$form_state, $format) {
  * Clear the filter's cache when configuration settings are saved.
  */
 function filter_admin_configure_submit($form, &$form_state) {
-  cache_clear_all($form_state['values']['format'] . ':', 'cache_filter', TRUE);
+  cache_clear_all($form_state['values']['format'] .':', 'cache_filter', TRUE);
 }
 
 /**
  * Menu callback; display form for ordering filters for a format.
  */
 function filter_admin_order_page($format) {
-  drupal_set_title(t("Rearrange %format", array('%format' => $format->name)), PASS_THROUGH);
+  drupal_set_title(t("Rearrange %format", array('%format' => $format->name)));
   return drupal_get_form('filter_admin_order', $format);
 }
 
@@ -394,7 +344,7 @@ function filter_admin_order(&$form_state, $format = NULL) {
 
   $form['weights'] = array('#tree' => TRUE);
   foreach ($filters as $id => $filter) {
-    $form['names'][$id] = array('#markup' => $filter->name);
+    $form['names'][$id] = array('#value' => $filter->name);
     $form['weights'][$id] = array('#type' => 'weight', '#default_value' => $filter->weight);
   }
   $form['format'] = array('#type' => 'hidden', '#value' => $format->format);
@@ -423,7 +373,7 @@ function theme_filter_admin_order($form) {
   }
 
   $output = theme('table', $header, $rows, array('id' => 'filter-order'));
-  $output .= drupal_render_children($form);
+  $output .= drupal_render($form);
 
   drupal_add_tabledrag('filter-order', 'order', 'sibling', 'filter-order-weight', NULL, NULL, FALSE);
 
@@ -436,14 +386,9 @@ function theme_filter_admin_order($form) {
 function filter_admin_order_submit($form, &$form_state) {
   foreach ($form_state['values']['weights'] as $id => $weight) {
     list($module, $delta) = explode('/', $id);
-    db_update('filter')
-      ->fields(array('weight' => $weight))
-      ->condition('format', $form_state['values']['format'])
-      ->condition('module', $module)
-      ->condition('delta', $delta)
-      ->execute();
+    db_query("UPDATE {filters} SET weight = %d WHERE format = %d AND module = '%s' AND delta = %d", $weight, $form_state['values']['format'], $module, $delta);
   }
   drupal_set_message(t('The filter ordering has been saved.'));
 
-  cache_clear_all($form_state['values']['format'] . ':', 'cache_filter', TRUE);
+  cache_clear_all($form_state['values']['format'] .':', 'cache_filter', TRUE);
 }

@@ -1,36 +1,11 @@
 <?php
-// $Id: taxonomy.install,v 1.20 2009/06/18 15:46:30 dries Exp $
+// $Id: taxonomy.install,v 1.7.2.1 2009/01/06 15:46:38 goba Exp $
 
 /**
- * @file
- * Install, update and uninstall functions for the taxonomy module.
- */
-
- /**
- * Implement hook_install().
- */
-function taxonomy_install() {
-  // Create tables.
-  drupal_install_schema('taxonomy');
-}
-
-/**
- * Implement hook_uninstall().
- */
-function taxonomy_uninstall() {
-  // Remove tables.
-  drupal_uninstall_schema('taxonomy');
-
-  // Remove variables.
-  variable_del('taxonomy_override_selector');
-  variable_del('taxonomy_terms_per_page_admin');
-}
-
-/**
- * Implement hook_schema().
+ * Implementation of hook_schema().
  */
 function taxonomy_schema() {
-  $schema['taxonomy_term_data'] = array(
+  $schema['term_data'] = array(
     'description' => 'Stores term information.',
     'fields' => array(
       'tid' => array(
@@ -44,7 +19,7 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {taxonomy_vocabulary}.vid of the vocabulary to which the term is assigned.',
+        'description' => 'The {vocabulary}.vid of the vocabulary to which the term is assigned.',
       ),
       'name' => array(
         'type' => 'varchar',
@@ -68,16 +43,13 @@ function taxonomy_schema() {
       ),
     ),
     'primary key' => array('tid'),
-    'foreign keys' => array(
-      'vid' => array('taxonomy_vocabulary' => 'vid'),
-    ),
     'indexes' => array(
       'taxonomy_tree' => array('vid', 'weight', 'name'),
       'vid_name' => array('vid', 'name'),
     ),
   );
 
-  $schema['taxonomy_term_hierarchy'] = array(
+  $schema['term_hierarchy'] = array(
     'description' => 'Stores the hierarchical relationship between terms.',
     'fields' => array(
       'tid' => array(
@@ -85,26 +57,23 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Primary Key: The {taxonomy_term_data}.tid of the term.',
+        'description' => 'Primary Key: The {term_data}.tid of the term.',
       ),
       'parent' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => "Primary Key: The {taxonomy_term_data}.tid of the term's parent. 0 indicates no parent.",
+        'description' => "Primary Key: The {term_data}.tid of the term's parent. 0 indicates no parent.",
       ),
     ),
     'indexes' => array(
       'parent' => array('parent'),
     ),
-    'foreign keys' => array(
-      'tid' => array('taxonomy_term_data' => 'tid'),
-    ),
     'primary key' => array('tid', 'parent'),
   );
 
-  $schema['taxonomy_term_node'] = array(
+  $schema['term_node'] = array(
     'description' => 'Stores the relationship of terms to nodes.',
     'fields' => array(
       'nid' => array(
@@ -126,22 +95,17 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Primary Key: The {taxonomy_term_data}.tid of a term assigned to the node.',
+        'description' => 'Primary Key: The {term_data}.tid of a term assigned to the node.',
       ),
     ),
     'indexes' => array(
       'vid' => array('vid'),
       'nid' => array('nid'),
     ),
-    'foreign keys' => array(
-      'nid' => array('node' => 'nid'),
-      'vid' => array('node' => 'vid'),
-      'tid' => array('taxonomy_term_data' => 'tid'),
-    ),
     'primary key' => array('tid', 'vid'),
   );
 
-  $schema['taxonomy_term_relation'] = array(
+  $schema['term_relation'] = array(
     'description' => 'Stores non-hierarchical relationships between terms.',
     'fields' => array(
       'trid' => array(
@@ -154,14 +118,14 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {taxonomy_term_data}.tid of the first term in a relationship.',
+        'description' => 'The {term_data}.tid of the first term in a relationship.',
       ),
       'tid2' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {taxonomy_term_data}.tid of the second term in a relationship.',
+        'description' => 'The {term_data}.tid of the second term in a relationship.',
       ),
     ),
     'unique keys' => array(
@@ -170,14 +134,10 @@ function taxonomy_schema() {
     'indexes' => array(
       'tid2' => array('tid2'),
     ),
-    'foreign keys' => array(
-      'tid1' => array('taxonomy_term_data' => 'tid'),
-      'tid2' => array('taxonomy_term_data' => 'tid'),
-    ),
     'primary key' => array('trid'),
   );
 
-  $schema['taxonomy_term_synonym'] = array(
+  $schema['term_synonym'] = array(
     'description' => 'Stores term synonyms.',
     'fields' => array(
       'tsid' => array(
@@ -190,7 +150,7 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {taxonomy_term_data}.tid of the term.',
+        'description' => 'The {term_data}.tid of the term.',
       ),
       'name' => array(
         'type' => 'varchar',
@@ -204,13 +164,10 @@ function taxonomy_schema() {
       'tid' => array('tid'),
       'name_tid' => array('name', 'tid'),
     ),
-    'foreign keys' => array(
-      'tid' => array('taxonomy_term_data' => 'tid'),
-    ),
     'primary key' => array('tsid'),
   );
 
-  $schema['taxonomy_vocabulary'] = array(
+  $schema['vocabulary'] = array(
     'description' => 'Stores vocabulary information.',
     'fields' => array(
       'vid' => array(
@@ -225,13 +182,6 @@ function taxonomy_schema() {
         'not null' => TRUE,
         'default' => '',
         'description' => 'Name of the vocabulary.',
-      ),
-      'machine_name' => array(
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-        'description' => 'The vocabulary machine name.',
       ),
       'description' => array(
         'type' => 'text',
@@ -307,7 +257,7 @@ function taxonomy_schema() {
     ),
   );
 
-  $schema['taxonomy_vocabulary_node_type'] = array(
+  $schema['vocabulary_node_types'] = array(
     'description' => 'Stores which node types vocabularies may be used with.',
     'fields' => array(
       'vid' => array(
@@ -315,7 +265,7 @@ function taxonomy_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Primary Key: the {taxonomy_vocabulary}.vid of the vocabulary.',
+        'description' => 'Primary Key: the {vocabulary}.vid of the vocabulary.',
       ),
       'type' => array(
         'type' => 'varchar',
@@ -329,36 +279,8 @@ function taxonomy_schema() {
     'indexes' => array(
       'vid' => array('vid'),
     ),
-    'foreign keys' => array(
-      'vid' => array('taxonomy_vocabulary' => 'vid'),
-    ),
   );
 
   return $schema;
 }
 
-/**
- * Add vocabulary machine_name column.
- */
-function taxonomy_update_7002() {
-  $ret = array();
-  $field = array(
-    'type' => 'varchar',
-    'length' => 255,
-    'not null' => TRUE,
-    'default' => '',
-    'description' => 'The vocabulary machine name.',
-  );
-
-  db_add_field($ret, 'taxonomy_vocabulary', 'machine_name', $field);
-
-  foreach (taxonomy_get_vocabularies() as $vid => $vocabulary) {
-    $machine_name = 'vocabulary_' . $vid;
-    db_update('taxonomy_vocabulary')
-      ->fields(array('machine_name' => 'vocabulary_' . $vid))
-      ->condition('vid', $vid)
-      ->execute();
-    field_attach_create_bundle($machine_name);
-  }
-  return $ret;
-}

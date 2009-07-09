@@ -1,21 +1,6 @@
-/* $Id: locale.css,v 1.3 2009/07/04 14:57:23 dries Exp $ */
+/* $Id: locale.css,v 1.1 2006/08/14 07:14:49 drumm Exp $ */
 
 .locale-untranslated {
   font-style: normal;
   text-decoration: line-through;
-}
-
-.form-item-language-wrapper, .form-item-translation-wrapper, .form-item-group-wrapper {
-  float: left; /* LTR */
-  padding-right: .8em; /* LTR */
-  margin: 0.1em;
-  /**
-   * In Opera 9, DOM elements with the property of "overflow: auto"
-   * will partially hide its contents with unnecessary scrollbars when
-   * its immediate child is floated without an explicit width set.
-   */
-  width: 15em;
-}
-#locale-translation-filter-form .form-item select.form-select {
-  width: 100%;
 }

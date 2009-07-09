@@ -1,10 +1,9 @@
 <?php
-// $Id: search-block-form.tpl.php,v 1.3 2008/12/30 16:43:18 dries Exp $
+// $Id: search-block-form.tpl.php,v 1.1 2007/10/31 18:06:38 dries Exp $
 
 /**
- * @file
- * Default theme implementation for displaying a search form within a block
- * region.
+ * @file search-block-form.tpl.php
+ * Default theme implementation for displaying a search form within a block region.
  *
  * Available variables:
  * - $search_form: The complete search form ready for print.
@@ -18,7 +17,7 @@
  *
  * Since $search is keyed, a direct print of the form element is possible.
  * Modules can add to the search form so it is recommended to check for their
- * existence before printing. The default keys will always exist.
+ * existance before printing. The default keys will always exist.
  *
  *   <?php if (isset($search['extra_field'])): ?>
  *     <div class="extra-field">

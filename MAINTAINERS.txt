@@ -1,63 +1,86 @@
-// $Id: MAINTAINERS.txt,v 1.30 2009/04/28 20:20:14 webchick Exp $
+// $Id: MAINTAINERS.txt,v 1.19.2.2 2009/04/29 17:15:10 goba Exp $
 
 List of maintainers
 --------------------------------------------------------------------------------
 
+LEGEND
+======
+
+- M: the maintainer
+- S: status:
+      "supported"     : someone is actually paid to look after this.
+      "maintained"    : someone actually looks after it.
+      "fixes/patches" : it has a maintainer but they don't have time to
+                        do much other than throw the odd patch in.
+      "orphan"        : no current maintainer, but maybe you could take
+                        the role as you write new code?
+
+--------------------------------------------------------------------------------
+
 BLOG API
-James Walker 'walkah' <http://drupal.org/user/1531>
+M: James Walker <walkah@walkah.net>
+S: maintained
 
-DATABASE SYSTEM
-Larry Garfield 'Crell' <http://drupal.org/user/26398>
-
- - MYSQL DRIVER
-   Larry Garfield 'Crell' <http://drupal.org/user/26398>
-   David Strauss 'David Strauss' <hhttp://drupal.org/user/93254>
-
- - POSTGRESQL DRIVER
-   Damien Tournoud 'DamZ' <http://drupal.org/user/22211>
-   Josh Waihi 'fiasco' <http://drupal.org/user/188162>
-
- - SQLITE DRIVER
-   Damien Tournoud 'DamZ' <http://drupal.org/user/22211>
-   Károly Négyesi 'chx' <http://drupal.org/user/9446>
+DISTRIBUTED AUTHENTICATION MODULES
+M: Moshe Weitzman <weitzman@tejasa.com>
+S: maintained
 
 DOCUMENTATION COORDINATOR
-Addison Berry 'add1sun' <http://drupal.org/user/65088>
+M: Steven Peck <speck@blkmtn.org>
+S: maintained
 
-FILE MANAGEMENT SYSTEM
-Andrew Morton 'drewish' <http://drupal.org/user/34869>
+FILTER SYSTEM
+M: Steven Wittens <unconed@drupal.org>
+S: maintained
 
 FORM SYSTEM
-Károly Négyesi 'chx' <http://drupal.org/user/9446>
+M: Károly Négyesi <chx@mail.tvnet.hu>
+S: maintained
 
 LOCALE MODULE
-Gabor Hojtsy 'goba' <http://drupal.org/user/4166>
+M: Gabor Hojtsy <goba@php.net>
+S: maintained
 
 LOGGING
-Khalid Baheyeldin 'kbahey' <http://drupal.org/user/4063>
+M: Khalid Baheyeldin <drupal@2bits.com>
+S: maintained
 
 MENU SYSTEM
-Peter Wolanin <http://drupal.org/user/49851>
+M: Károly Négyesi <chx@mail.tvnet.hu>
+S: maintained
+
+PATH MODULE
+M: Matt Westgate <drupal@asitis.org>
+S: maintained
+
+POSTGRESQL
+M: Sammy Spets <sammys-drupal@synerger.com>
+S: maintained
 
 SECURITY COORDINATOR
-Heine Deelstra 'heine' <http://drupal.org/user/17943>
+M: Heine Deelstra <hdeelstra@gmail.com>
+S: maintained
 
-TESTING SUBSYSTEM
-Károly Négyesi 'chx' <http://drupal.org/user/9446>
-Jimmy Berry 'boombatower' <http://drupal.org/user/214218>
+STATISTICS MODULE
+M: Jeremy Andrews <jeremy@kerneltrap.com>
+S: maintained
 
 THEME SYSTEM
-Earl Miles 'merlinofchaos' <http://drupal.org/user/26979>
-Joon Park 'dvessel' <http://drupal.org/user/56782>
+M: Earl Miles <merlin@logrus.com>
+   Joon Park <joon@dvessel.com>
+S: maintained
 
 UPDATE MODULE
-Derek Wright 'dww' <http://drupal.org/user/46549>
+M: Derek Wright <http://drupal.org/user/46549/contact>
+S: maintained
+
+XML-RPC SERVER/CLIENT
+M: John VanDyk <http://drupal.org/user/2375/contact>
+S: maintained
 
 TRANSLATIONS COORDINATOR
-Gerhard Killesreiter 'killes' <http://drupal.org/user/83>
-
-GARLAND THEME
-Stefan Nagtegaal 'steef' <http://drupal.org/user/612>
+M: Gerhard Killesreiter <gerhard@killesreiter.de>
+S: maintained
 
 THE REST:
-Dries Buytaert 'dries' <http://drupal.org/user/1>
+M: Dries <dries@drupal.org>

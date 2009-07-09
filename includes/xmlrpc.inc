@@ -1,5 +1,5 @@
 <?php
-// $Id: xmlrpc.inc,v 1.58 2009/06/15 10:10:46 dries Exp $
+// $Id: xmlrpc.inc,v 1.47.2.5 2009/01/14 21:36:16 goba Exp $
 
 /**
  * @file
@@ -51,7 +51,7 @@ function xmlrpc_value($data, $type = FALSE) {
  * @see
  *   http://www.xmlrpc.com/spec#scalars
  */
-function xmlrpc_value_calculate_type($xmlrpc_value) {
+function xmlrpc_value_calculate_type(&$xmlrpc_value) {
   // http://www.php.net/gettype: Never use gettype() to test for a certain type [...] Instead, use the is_* functions.
   if (is_bool($xmlrpc_value->data)) {
     return 'boolean';
@@ -67,10 +67,10 @@ function xmlrpc_value_calculate_type($xmlrpc_value) {
     return empty($xmlrpc_value->data) || range(0, count($xmlrpc_value->data) - 1) === array_keys($xmlrpc_value->data) ? 'array' : 'struct';
   }
   if (is_object($xmlrpc_value->data)) {
-    if (isset($xmlrpc_value->data->is_date)) {
+    if ($xmlrpc_value->data->is_date) {
       return 'date';
     }
-    if (isset($xmlrpc_value->data->is_base64)) {
+    if ($xmlrpc_value->data->is_base64) {
       return 'base64';
     }
     $xmlrpc_value->data = get_object_vars($xmlrpc_value->data);
@@ -90,32 +90,32 @@ function xmlrpc_value_calculate_type($xmlrpc_value) {
 function xmlrpc_value_get_xml($xmlrpc_value) {
   switch ($xmlrpc_value->type) {
     case 'boolean':
-      return '<boolean>' . (($xmlrpc_value->data) ? '1' : '0') . '</boolean>';
+      return '<boolean>'. (($xmlrpc_value->data) ? '1' : '0') .'</boolean>';
       break;
     case 'int':
-      return '<int>' . $xmlrpc_value->data . '</int>';
+      return '<int>'. $xmlrpc_value->data .'</int>';
       break;
     case 'double':
-      return '<double>' . $xmlrpc_value->data . '</double>';
+      return '<double>'. $xmlrpc_value->data .'</double>';
       break;
     case 'string':
       // Note: we don't escape apostrophes because of the many blogging clients
       // that don't support numerical entities (and XML in general) properly.
-      return '<string>' . htmlspecialchars($xmlrpc_value->data) . '</string>';
+      return '<string>'. htmlspecialchars($xmlrpc_value->data) .'</string>';
       break;
     case 'array':
-      $return = '<array><data>' . "\n";
+      $return = '<array><data>'."\n";
       foreach ($xmlrpc_value->data as $item) {
-        $return .= '  <value>' . xmlrpc_value_get_xml($item) . "</value>\n";
+        $return .= '  <value>'. xmlrpc_value_get_xml($item) ."</value>\n";
       }
       $return .= '</data></array>';
       return $return;
       break;
     case 'struct':
-      $return = '<struct>' . "\n";
+      $return = '<struct>'."\n";
       foreach ($xmlrpc_value->data as $name => $value) {
-        $return .= "  <member><name>" . check_plain($name) . "</name><value>";
-        $return .= xmlrpc_value_get_xml($value) . "</value></member>\n";
+        $return .= "  <member><name>". check_plain($name) ."</name><value>";
+        $return .= xmlrpc_value_get_xml($value) ."</value></member>\n";
       }
       $return .= '</struct>';
       return $return;
@@ -156,9 +156,9 @@ function xmlrpc_message($message) {
  * @return
  *   TRUE if parsing succeeded; FALSE otherwise
  */
-function xmlrpc_message_parse($xmlrpc_message) {
+function xmlrpc_message_parse(&$xmlrpc_message) {
   // First remove the XML declaration
-  $xmlrpc_message->message = preg_replace('/<\?xml(.*)?\?' . '>/', '', $xmlrpc_message->message);
+  $xmlrpc_message->message = preg_replace('/<\?xml(.*)?\?'.'>/', '', $xmlrpc_message->message);
   if (trim($xmlrpc_message->message) == '') {
     return FALSE;
   }
@@ -342,13 +342,16 @@ EOD;
 }
 
 
-function xmlrpc_error($code = NULL, $message = NULL) {
+function xmlrpc_error($code = NULL, $message = NULL, $reset = FALSE) {
   static $xmlrpc_error;
   if (isset($code)) {
     $xmlrpc_error = new stdClass();
     $xmlrpc_error->is_error = TRUE;
     $xmlrpc_error->code = $code;
     $xmlrpc_error->message = $message;
+  }
+  elseif ($reset) {
+    $xmlrpc_error = NULL;
   }
   return $xmlrpc_error;
 }
@@ -402,7 +405,7 @@ function xmlrpc_date($time) {
 }
 
 function xmlrpc_date_get_xml($xmlrpc_date) {
-  return '<dateTime.iso8601>' . $xmlrpc_date->year . $xmlrpc_date->month . $xmlrpc_date->day . 'T' . $xmlrpc_date->hour . ':' . $xmlrpc_date->minute . ':' . $xmlrpc_date->second . '</dateTime.iso8601>';
+  return '<dateTime.iso8601>'. $xmlrpc_date->year . $xmlrpc_date->month . $xmlrpc_date->day .'T'. $xmlrpc_date->hour .':'. $xmlrpc_date->minute .':'. $xmlrpc_date->second .'</dateTime.iso8601>';
 }
 
 function xmlrpc_base64($data) {
@@ -413,34 +416,20 @@ function xmlrpc_base64($data) {
 }
 
 function xmlrpc_base64_get_xml($xmlrpc_base64) {
-  return '<base64>' . base64_encode($xmlrpc_base64->data) . '</base64>';
+  return '<base64>'. base64_encode($xmlrpc_base64->data) .'</base64>';
 }
 
 /**
- * Performs one or more XML-RPC request(s).
+ * Execute an XML remote procedural call. This is private function; call xmlrpc()
+ * in common.inc instead of this function.
  *
- * @param $url
- *   An absolute URL of the XML-RPC endpoint.
- *     Example:
- *     http://www.example.com/xmlrpc.php
- * @param ...
- *   For one request:
- *     The method name followed by a variable number of arguments to the method.
- *   For multiple requests (system.multicall):
- *     An array of call arrays. Each call array follows the pattern of the single
- *     request: method name followed by the arguments to the method.
  * @return
- *   For one request:
- *     Either the return value of the method on success, or FALSE.
- *     If FALSE is returned, see xmlrpc_errno() and xmlrpc_error_msg().
- *   For multiple requests:
- *     An array of results. Each result will either be the result
- *     returned by the method called, or an xmlrpc_error object if the call
- *     failed. See xmlrpc_error().
+ *   A $xmlrpc_message object if the call succeeded; FALSE if the call failed
  */
-function xmlrpc() {
+function _xmlrpc() {
   $args = func_get_args();
   $url = array_shift($args);
+  xmlrpc_clear_error();
   if (is_array($args[0])) {
     $method = 'system.multicall';
     $multicall_args = array();
@@ -453,12 +442,7 @@ function xmlrpc() {
     $method = array_shift($args);
   }
   $xmlrpc_request = xmlrpc_request($method, $args);
-  $options = array(
-    'headers' => array('Content-Type' => 'text/xml'),
-    'method' => 'POST',
-    'data' => $xmlrpc_request->xml,
-  );
-  $result = drupal_http_request($url, $options);
+  $result = drupal_http_request($url, array("Content-Type" => "text/xml"), 'POST', $xmlrpc_request->xml);
   if ($result->code != 200) {
     xmlrpc_error($result->code, $result->error);
     return FALSE;
@@ -493,4 +477,11 @@ function xmlrpc_errno() {
 function xmlrpc_error_msg() {
   $error = xmlrpc_error();
   return ($error != NULL ? $error->message : NULL);
+}
+
+/**
+ * Clears any previous error.
+ */
+function xmlrpc_clear_error() {
+  xmlrpc_error(NULL, NULL, TRUE);
 }

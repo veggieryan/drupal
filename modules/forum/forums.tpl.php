@@ -1,8 +1,8 @@
 <?php
-// $Id: forums.tpl.php,v 1.5 2008/10/13 12:31:42 dries Exp $
+// $Id: forums.tpl.php,v 1.4 2007/08/07 08:39:35 goba Exp $
 
 /**
- * @file
+ * @file forums.tpl.php
  * Default theme implementation to display a forum which may contain forum
  * containers as well as forum topics.
  *

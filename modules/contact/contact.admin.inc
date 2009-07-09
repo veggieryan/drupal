@@ -1,5 +1,5 @@
 <?php
-// $Id: contact.admin.inc,v 1.12 2009/06/29 14:24:56 webchick Exp $
+// $Id: contact.admin.inc,v 1.3 2007/11/09 07:55:13 dries Exp $
 
 /**
  * @file
@@ -10,28 +10,12 @@
  * Categories/list tab.
  */
 function contact_admin_categories() {
-  $rows = array();
-
-  $header = array(t('Category'), t('Recipients'), t('Selected'), array('data' => t('Operations'), 'colspan' => 2));
-
-  // Get all the contact categories from the database.
   $result = db_query('SELECT cid, category, recipients, selected FROM {contact} ORDER BY weight, category');
-
-  // Loop through the categories and add them to the table.
-  foreach ($result as $record) {
-    $rows[] = array(
-      $record->category,
-      $record->recipients,
-      ($record->selected ? t('Yes') : t('No')),
-      l(t('edit'), 'admin/build/contact/edit/' . $record->cid),
-      l(t('delete'), 'admin/build/contact/delete/' . $record->cid),
-    );
+  $rows = array();
+  while ($category = db_fetch_object($result)) {
+    $rows[] = array($category->category, $category->recipients, ($category->selected ? t('Yes') : t('No')), l(t('edit'), 'admin/build/contact/edit/'. $category->cid), l(t('delete'), 'admin/build/contact/delete/'. $category->cid));
   }
-
-  // If no categories were found, let the user know.
-  if (empty($rows)) {
-    $rows[] = array(array('data' => t('No categories available. <a href="@link">Add category</a>.', array('@link' => url('admin/build/contact/add'))), 'colspan' => 5));
-  }
+  $header = array(t('Category'), t('Recipients'), t('Selected'), array('data' => t('Operations'), 'colspan' => 2));
 
   return theme('table', $header, $rows);
 }
@@ -62,7 +46,7 @@ function contact_admin_edit($form_state = array(), $op, $contact = NULL) {
   $form['recipients'] = array('#type' => 'textarea',
     '#title' => t('Recipients'),
     '#default_value' => $contact['recipients'],
-    '#description' => t("Example: 'webmaster@example.com' or 'sales@example.com,support@example.com' . To specify multiple recipients, separate each e-mail address with a comma."),
+    '#description' => t("Example: 'webmaster@example.com' or 'sales@example.com,support@example.com'. To specify multiple recipients, separate each e-mail address with a comma."),
     '#required' => TRUE,
   );
   $form['reply'] = array('#type' => 'textarea',
@@ -95,10 +79,18 @@ function contact_admin_edit($form_state = array(), $op, $contact = NULL) {
  * Validate the contact category edit page form submission.
  */
 function contact_admin_edit_validate($form, &$form_state) {
-  $recipients = explode(',', $form_state['values']['recipients']);
-  foreach ($recipients as $recipient) {
-    if (!valid_email_address(trim($recipient))) {
-      form_set_error('recipients', t('%recipient is an invalid e-mail address.', array('%recipient' => $recipient)));
+  if (empty($form_state['values']['category'])) {
+    form_set_error('category', t('You must enter a category.'));
+  }
+  if (empty($form_state['values']['recipients'])) {
+    form_set_error('recipients', t('You must enter one or more recipients.'));
+  }
+  else {
+    $recipients = explode(',', $form_state['values']['recipients']);
+    foreach ($recipients as $recipient) {
+      if (!valid_email_address(trim($recipient))) {
+        form_set_error('recipients', t('%recipient is an invalid e-mail address.', array('%recipient' => $recipient)));
+      }
     }
   }
 }
@@ -109,9 +101,7 @@ function contact_admin_edit_validate($form, &$form_state) {
 function contact_admin_edit_submit($form, &$form_state) {
   if ($form_state['values']['selected']) {
     // Unselect all other contact categories.
-    db_update('contact')
-      ->fields(array('selected' => '0'))
-      ->execute();
+    db_query('UPDATE {contact} SET selected = 0');
   }
   $recipients = explode(',', $form_state['values']['recipients']);
   foreach ($recipients as $key => $recipient) {
@@ -153,9 +143,7 @@ function contact_admin_delete(&$form_state, $contact) {
  */
 function contact_admin_delete_submit($form, &$form_state) {
   $contact = $form_state['values']['contact'];
-  db_delete('contact')
-    ->condition('cid', $contact['cid'])
-    ->execute();
+  db_query("DELETE FROM {contact} WHERE cid = %d", $contact['cid']);
   drupal_set_message(t('Category %category has been deleted.', array('%category' => $contact['category'])));
   watchdog('mail', 'Contact form: category %category deleted.', array('%category' => $contact['category']), WATCHDOG_NOTICE);
 
@@ -164,17 +152,22 @@ function contact_admin_delete_submit($form, &$form_state) {
 }
 
 function contact_admin_settings() {
+  $form['contact_form_information'] = array('#type' => 'textarea',
+    '#title' => t('Additional information'),
+    '#default_value' => variable_get('contact_form_information', t('You can leave a message using the contact form below.')),
+    '#description' => t('Information to show on the <a href="@form">contact page</a>. Can be anything from submission guidelines to your postal address or telephone number.', array('@form' => url('contact'))),
+  );
   $form['contact_hourly_threshold'] = array('#type' => 'select',
     '#title' => t('Hourly threshold'),
     '#options' => drupal_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50)),
-    '#default_value' => 3,
+    '#default_value' => variable_get('contact_hourly_threshold', 3),
     '#description' => t('The maximum number of contact form submissions a user can perform per hour.'),
   );
   $form['contact_default_status'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable personal contact form by default'),
-    '#default_value' => 1,
+    '#default_value' => variable_get('contact_default_status', 1),
     '#description' => t('Default status of the personal contact form for new users.'),
   );
-  return system_settings_form($form, TRUE);
+  return system_settings_form($form);
 }

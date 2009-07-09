@@ -1,5 +1,5 @@
 <?php
-// $Id: update.compare.inc,v 1.23 2009/06/13 11:27:35 dries Exp $
+// $Id: update.compare.inc,v 1.8.2.5 2009/06/09 11:08:32 goba Exp $
 
 /**
  * @file
@@ -30,18 +30,18 @@
  * @see update_project_cache()
  */
 function update_get_projects() {
-  $projects = &drupal_static(__FUNCTION__, array());
+  static $projects = array();
   if (empty($projects)) {
     // Retrieve the projects from cache, if present.
     $projects = update_project_cache('update_project_projects');
     if (empty($projects)) {
       // Still empty, so we have to rebuild the cache.
-      _update_process_info_list($projects, system_get_module_data(), 'module');
-      _update_process_info_list($projects, system_get_theme_data(), 'theme');
+      _update_process_info_list($projects, module_rebuild_cache(), 'module');
+      _update_process_info_list($projects, system_theme_data(), 'theme');
       // Allow other modules to alter projects before fetching and comparing.
       drupal_alter('update_projects', $projects);
       // Cache the site's project data for at most 1 hour.
-      _update_cache_set('update_project_projects', $projects, REQUEST_TIME + 3600);
+      _update_cache_set('update_project_projects', $projects, time() + 3600);
     }
   }
   return $projects;
@@ -80,7 +80,7 @@ function _update_process_info_list(&$projects, $list, $project_type) {
     // which is left alone by tar and correctly set to the time the .info file
     // was unpacked.
     if (!isset($file->info['_info_file_ctime'])) {
-      $info_filename = dirname($file->filepath) . '/' . $file->name . '.info';
+      $info_filename = dirname($file->filename) .'/'. $file->name .'.info';
       $file->info['_info_file_ctime'] = filectime($info_filename);
     }
 
@@ -114,10 +114,10 @@ function update_get_project_name($file) {
   if (isset($file->info['project'])) {
     $project_name = $file->info['project'];
   }
-  elseif (isset($file->info['package']) && (strpos($file->info['package'], 'Core') !== FALSE)) {
+  elseif (isset($file->info['package']) && (strpos($file->info['package'], 'Core -') !== FALSE)) {
     $project_name = 'drupal';
   }
-  elseif (in_array($file->name, array('garland', 'minnelli', 'stark'))) {
+  elseif (in_array($file->name, array('bluemarine', 'chameleon', 'garland', 'marvin', 'minnelli', 'pushbutton'))) {
     // Unfortunately, there's no way to tell if a theme is part of core,
     // so we must hard-code a list here.
     $project_name = 'drupal';
@@ -409,8 +409,8 @@ function update_calculate_project_data($available) {
         // Otherwise, ignore unpublished, insecure, or unsupported releases.
         if ($release['status'] == 'unpublished' ||
             (isset($release['terms']['Release type']) &&
-              (in_array('Insecure', $release['terms']['Release type']) ||
-                in_array('Unsupported', $release['terms']['Release type'])))) {
+             (in_array('Insecure', $release['terms']['Release type']) ||
+              in_array('Unsupported', $release['terms']['Release type'])))) {
           continue;
         }
 
@@ -578,7 +578,7 @@ function update_calculate_project_data($available) {
   drupal_alter('update_status', $projects);
 
   // Cache the site's update status for at most 1 hour.
-  _update_cache_set('update_project_data', $projects, REQUEST_TIME + 3600);
+  _update_cache_set('update_project_data', $projects, time() + 3600);
   return $projects;
 }
 
@@ -622,7 +622,7 @@ function update_project_cache($cid) {
   }
   else {
     $cache = _update_cache_get($cid);
-    if (!empty($cache->data) && $cache->expire > REQUEST_TIME) {
+    if (!empty($cache->data) && $cache->expire > time()) {
       $projects = $cache->data;
     }
   }

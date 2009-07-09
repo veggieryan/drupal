@@ -1,5 +1,5 @@
 <?php
-// $Id: taxonomy.pages.inc,v 1.31 2009/07/08 07:18:08 dries Exp $
+// $Id: taxonomy.pages.inc,v 1.9.2.1 2009/04/27 11:49:05 goba Exp $
 
 /**
  * @file
@@ -8,134 +8,130 @@
 
 /**
  * Menu callback; displays all nodes associated with a term.
- *
- * @param $term
- *   The taxonomy term.
- * @return
- *   The page content.
  */
-function taxonomy_term_page($term) {
-  // Build breadcrumb based on the hierarchy of the term.
-  $current = (object) array(
-    'tid' => $term->tid,
-  );
-  $breadcrumb = array();
-  while ($parents = taxonomy_get_parents($current->tid)) {
-    $current = array_shift($parents);
-    $breadcrumb[] = l($current->name, taxonomy_term_path($current));
-  }
-  $breadcrumb[] = l(t('Home'), NULL);
-  $breadcrumb = array_reverse($breadcrumb);
-  drupal_set_breadcrumb($breadcrumb);
-  drupal_add_feed(url('taxonomy/term/' . $term->tid . '/feed'), 'RSS - ' . $term->name);
-  drupal_add_css(drupal_get_path('module', 'taxonomy') . '/taxonomy.css');
-
-  $build = array();
-  $build += field_attach_view('taxonomy_term', $term);
-  if (!empty($term->description)) {
-    $build['term_description'] = array(
-      '#markup' => filter_xss_admin($term->description),
-      '#weight' => -1,
-      '#prefix' => '<div class="taxonomy-term-description">',
-      '#suffix' => '</div>',
-    );
+function taxonomy_term_page($str_tids = '', $depth = 0, $op = 'page') {
+  $terms = taxonomy_terms_parse_string($str_tids);
+  if ($terms['operator'] != 'and' && $terms['operator'] != 'or') {
+    drupal_not_found();
   }
 
-  if ($nids = taxonomy_select_nodes(array($term->tid), NULL, TRUE)) {
-    $nodes = node_load_multiple($nids);
-    $build += node_build_multiple($nodes);
-    $build['pager'] = array(
-      '#markup' => theme('pager', NULL),
-      '#weight' => 5,
-     );
+  if ($terms['tids']) {
+    $result = db_query(db_rewrite_sql('SELECT t.tid, t.name FROM {term_data} t WHERE t.tid IN ('. db_placeholders($terms['tids']) .')', 't', 'tid'), $terms['tids']);
+    $tids = array(); // we rebuild the $tids-array so it only contains terms the user has access to.
+    $names = array();
+    while ($term = db_fetch_object($result)) {
+      $tids[] = $term->tid;
+      $names[] = $term->name;
+    }
+
+    if ($names) {
+      $title = implode(', ', $names);
+      drupal_set_title(check_plain($title));
+
+      switch ($op) {
+        case 'page':
+          // Build breadcrumb based on first hierarchy of first term:
+          $current->tid = $tids[0];
+          $breadcrumb = array();
+          while ($parents = taxonomy_get_parents($current->tid)) {
+            $current = array_shift($parents);
+            $breadcrumb[] = l($current->name, 'taxonomy/term/'. $current->tid);
+          }
+          $breadcrumb[] = l(t('Home'), NULL);
+          $breadcrumb = array_reverse($breadcrumb);
+          drupal_set_breadcrumb($breadcrumb);
+
+          $output = theme('taxonomy_term_page', $tids, taxonomy_select_nodes($tids, $terms['operator'], $depth, TRUE));
+          drupal_add_feed(url('taxonomy/term/'. $str_tids .'/'. $depth .'/feed'), 'RSS - '. $title);
+          return $output;
+          break;
+
+        case 'feed':
+          $channel['link'] = url('taxonomy/term/'. $str_tids .'/'. $depth, array('absolute' => TRUE));
+          $channel['title'] = variable_get('site_name', 'Drupal') .' - '. $title;
+          // Only display the description if we have a single term, to avoid clutter and confusion.
+          if (count($tids) == 1) {
+            $term = taxonomy_get_term($tids[0]);
+            // HTML will be removed from feed description, so no need to filter here.
+            $channel['description'] = $term->description;
+          }
+
+          $result = taxonomy_select_nodes($tids, $terms['operator'], $depth, FALSE);
+          $items = array(); 
+          while ($row = db_fetch_object($result)) {
+            $items[] = $row->nid;
+          }
+
+          node_feed($items, $channel);
+          break;
+
+        default:
+          drupal_not_found();
+      }
+    }
+    else {
+      drupal_not_found();
+    }
   }
-  else {
-    $build['no_content'] = array(
-      '#prefix' => '<p>',
-      '#markup' => t('There are currently no posts in this category.'),
-      '#suffix' => '</p>',
-    );
-  }
-  return $build;
 }
 
 /**
- * Generate the content feed for a taxonomy term.
+ * Render a taxonomy term page HTML output.
  *
- * @param $term
- *   The taxonomy term.
+ * @param $tids
+ *   An array of term ids.
+ * @param $result
+ *   A pager_query() result, such as that performed by taxonomy_select_nodes().
+ *
+ * @ingroup themeable
  */
-function taxonomy_term_feed($term) {
-  $channel['link'] = url('taxonomy/term/' . $term->tid, array('absolute' => TRUE));
-  $channel['title'] = variable_get('site_name', 'Drupal') . ' - ' . $term->name;
+function theme_taxonomy_term_page($tids, $result) {
+  drupal_add_css(drupal_get_path('module', 'taxonomy') .'/taxonomy.css');
+
+  $output = '';
+
   // Only display the description if we have a single term, to avoid clutter and confusion.
-  // HTML will be removed from feed description, so no need to filter here.
-  $channel['description'] = $term->description;
-  $nids = taxonomy_select_nodes(array($term->tid, NULL, NULL, FALSE));
+  if (count($tids) == 1) {
+    $term = taxonomy_get_term($tids[0]);
+    $description = $term->description;
 
-  node_feed($nids, $channel);
-}
-
-/**
- * Page to edit a vocabulary term.
- */
-function taxonomy_term_edit($term) {
-  if (isset($term)) {
-    drupal_set_title($term->name);
-    return drupal_get_form('taxonomy_form_term', taxonomy_vocabulary_load($term->vid), (array)$term);
+    // Check that a description is set.
+    if (!empty($description)) {
+      $output .= '<div class="taxonomy-term-description">';
+      $output .= filter_xss_admin($description);
+      $output .= '</div>';
+    }
   }
-  return drupal_not_found();
+
+  $output .= taxonomy_render_nodes($result);
+
+  return $output;
 }
 
 /**
  * Helper function for autocompletion
  */
-function taxonomy_autocomplete($vid = 0, $tags_typed = '') {
+function taxonomy_autocomplete($vid, $string = '') {
   // The user enters a comma-separated list of tags. We only autocomplete the last tag.
-  $tags_typed = drupal_explode_tags($tags_typed);
-  $tag_last = drupal_strtolower(array_pop($tags_typed));
+  $array = drupal_explode_tags($string);
 
+  // Fetch last tag
+  $last_string = trim(array_pop($array));
   $matches = array();
-  if ($tag_last != '') {
-    $query = db_select('taxonomy_term_data', 't');
-    $query->addTag('term_access');
-    $query->leftJoin('taxonomy_term_synonym', 'ts', 't.tid = ts.tid');
-    // Don't select already entered terms.
-    if (count($tags_typed)) {
-      $query->condition('t.name', $tags_typed, 'NOT IN');
-    }
-    $tags_return = $query
-      ->fields('t', array('tid', 'name'))
-      ->condition('t.vid', $vid)
-      // Select rows that either match by term or synonym name.
-      ->condition(db_or()
-	    ->where("LOWER(t.name) LIKE :last_string", array(':last_string' => '%' . $tag_last . '%'))
-	    ->where("LOWER(ts.name) LIKE :last_string", array(':last_string' => '%' . $tag_last . '%'))
-      )
-      ->range(0, 10)
-      ->execute()
-      ->fetchAllKeyed();
+  if ($last_string != '') {
+    $result = db_query_range(db_rewrite_sql("SELECT t.tid, t.name FROM {term_data} t WHERE t.vid = %d AND LOWER(t.name) LIKE LOWER('%%%s%%')", 't', 'tid'), $vid, $last_string, 0, 10);
 
-    $prefix = count($tags_typed) ? implode(', ', $tags_typed) . ', ' : '';
+    $prefix = count($array) ? implode(', ', $array) .', ' : '';
 
-    // We use two arrays to make sure synonym suggestions appear last.
-    $term_matches = $synonym_matches = array();
-    foreach ($tags_return as $tid => $name) {
-      $n = $name;
+    while ($tag = db_fetch_object($result)) {
+      $n = $tag->name;
       // Commas and quotes in terms are special cases, so encode 'em.
-      if (strpos($name, ',') !== FALSE || strpos($name, '"') !== FALSE) {
-        $n = '"' . str_replace('"', '""', $name) . '"';
+      if (strpos($tag->name, ',') !== FALSE || strpos($tag->name, '"') !== FALSE) {
+        $n = '"'. str_replace('"', '""', $tag->name) .'"';
       }
-      // Inform the user his query matched a synonym rather than a term.
-      if (strpos(drupal_strtolower($name), $tag_last) === FALSE) {
-        $name = t('Did you mean %suggestion', array('%suggestion' => $name));
-        $synonym_matches[$prefix . $n] = filter_xss($name);
-      }
-      else {
-        $term_matches[$prefix . $n] = filter_xss($name);
-      }
+      $matches[$prefix . $n] = check_plain($tag->name);
     }
   }
 
-  drupal_json(array_merge($term_matches, $synonym_matches));
+  drupal_json($matches);
 }

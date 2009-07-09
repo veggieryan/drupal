@@ -1,5 +1,5 @@
 <?php
-// $Id: theme.inc,v 1.497 2009/07/02 04:27:22 webchick Exp $
+// $Id: theme.inc,v 1.415.2.24 2009/06/18 12:04:04 goba Exp $
 
 /**
  * @file
@@ -17,22 +17,9 @@
  * Markers used by theme_mark() and node_mark() to designate content.
  * @see theme_mark(), node_mark()
  */
-
-/**
- * Mark content as read.
- */
-define('MARK_READ', 0);
-
-/**
- * Mark content as being new.
- */
-define('MARK_NEW', 1);
-
-/**
- * Mark content as being updated.
- */
+define('MARK_READ',    0);
+define('MARK_NEW',     1);
 define('MARK_UPDATED', 2);
-
 /**
  * @} End of "Content markers".
  */
@@ -132,7 +119,7 @@ function _init_theme($theme, $base_theme = array(), $registry_callback = '_theme
   // And now add the stylesheets properly
   foreach ($final_stylesheets as $media => $stylesheets) {
     foreach ($stylesheets as $stylesheet) {
-      drupal_add_css($stylesheet, array('type' => 'theme', 'media' => $media));
+      drupal_add_css($stylesheet, 'theme', $media);
     }
   }
 
@@ -157,7 +144,7 @@ function _init_theme($theme, $base_theme = array(), $registry_callback = '_theme
 
   // Add scripts used by this theme.
   foreach ($final_scripts as $script) {
-    drupal_add_js($script, array('weight' => JS_THEME));
+    drupal_add_js($script, 'theme');
   }
 
   $theme_engine = NULL;
@@ -165,14 +152,14 @@ function _init_theme($theme, $base_theme = array(), $registry_callback = '_theme
   // Initialize the theme.
   if (isset($theme->engine)) {
     // Include the engine.
-    include_once DRUPAL_ROOT . '/' . $theme->owner;
+    include_once './'. $theme->owner;
 
     $theme_engine = $theme->engine;
-    if (function_exists($theme_engine . '_init')) {
+    if (function_exists($theme_engine .'_init')) {
       foreach ($base_theme as $base) {
-        call_user_func($theme_engine . '_init', $base);
+        call_user_func($theme_engine .'_init', $base);
       }
-      call_user_func($theme_engine . '_init', $theme);
+      call_user_func($theme_engine .'_init', $theme);
     }
   }
   else {
@@ -180,39 +167,26 @@ function _init_theme($theme, $base_theme = array(), $registry_callback = '_theme
     foreach ($base_theme as $base) {
       // Include the theme file or the engine.
       if (!empty($base->owner)) {
-        include_once DRUPAL_ROOT . '/' . $base->owner;
+        include_once './'. $base->owner;
       }
     }
     // and our theme gets one too.
     if (!empty($theme->owner)) {
-      include_once DRUPAL_ROOT . '/' . $theme->owner;
+      include_once './'. $theme->owner;
     }
   }
 
-  if (drupal_function_exists($registry_callback)) {
-    $registry_callback($theme, $base_theme, $theme_engine);
-  }
+  $registry_callback($theme, $base_theme, $theme_engine);
 }
 
 /**
- * Get the theme registry.
- * @return
- *   The theme registry array if it has been stored in memory, NULL otherwise.
+ * Retrieve the stored theme registry. If the theme registry is already
+ * in memory it will be returned; otherwise it will attempt to load the
+ * registry from cache. If this fails, it will construct the registry and
+ * cache it.
  */
-function theme_get_registry() {
-  return _theme_set_registry();
-}
-
-/**
- * Store the theme registry in memory.
- * @param $registry
- *   A registry array as returned by _theme_build_registry()
- * @return
- *   The theme registry array stored in memory
- */
-function _theme_set_registry($registry = NULL) {
+function theme_get_registry($registry = NULL) {
   static $theme_registry = NULL;
-
   if (isset($registry)) {
     $theme_registry = $registry;
   }
@@ -221,10 +195,19 @@ function _theme_set_registry($registry = NULL) {
 }
 
 /**
- * Get the theme_registry cache from the database; if it doesn't exist, build it.
+ * Store the theme registry in memory.
+ */
+function _theme_set_registry($registry) {
+  // Pass through for setting of static variable.
+  return theme_get_registry($registry);
+}
+
+/**
+ * Get the theme_registry cache from the database; if it doesn't exist, build
+ * it.
  *
  * @param $theme
- *   The loaded $theme object as returned by list_themes().
+ *   The loaded $theme object.
  * @param $base_theme
  *   An array of loaded $theme objects representing the ancestor themes in
  *   oldest first order.
@@ -257,69 +240,28 @@ function _theme_save_registry($theme, $registry) {
  * when modules are added to the system, or when a dynamic system needs
  * to add more theme hooks.
  */
-function drupal_theme_rebuild() {
+function drupal_rebuild_theme_registry() {
   cache_clear_all('theme_registry', 'cache', TRUE);
 }
 
 /**
- * Process a single implementation of hook_theme().
+ * Process a single invocation of the theme hook. $type will be one
+ * of 'module', 'theme_engine', 'base_theme_engine', 'theme', or 'base_theme'
+ * and it tells us some important information.
  *
- * @param $cache
- *   The theme registry that will eventually be cached; It is an associative
- *   array keyed by theme hooks, whose values are associative arrays describing
- *   the hook:
- *   - 'type': The passed in $type.
- *   - 'theme path': The passed in $path.
- *   - 'function': The name of the function generating output for this theme
- *     hook. Either defined explicitly in hook_theme() or, if neither 'function'
- *     nor 'template' is defined, then the default theme function name is used.
- *     The default theme function name is the theme hook prefixed by either
- *     'theme_' for modules or '$name_' for everything else. If 'function' is
- *     defined, 'template' is not used.
- *   - 'template': The filename of the template generating output for this
- *     theme hook. The template is in the directory defined by the 'path' key of
- *     hook_theme() or defaults to $path.
- *   - 'arguments': The arguments for this theme hook as defined in
- *     hook_theme(). If there is more than one implementation and 'arguments' is
- *     not specified in a later one, then the previous definition is kept.
- *   - 'theme paths': The paths where implementations of a theme hook can be
- *     found. Its definition is similarly inherited like 'arguments'. Each time
- *     _theme_process_registry() is called for this theme hook, either the
- *     'path' key from hook_theme() (if defined) or $path is added.
- *   - 'preprocess functions': See theme() for detailed documentation.
- *   - 'process functions': See theme() for detailed documentation.
- * @param $name
- *   The name of the module, theme engine, base theme engine, theme or base
- *   theme implementing hook_theme().
- * @param $type
- *   One of 'module', 'theme_engine', 'base_theme_engine', 'theme', or
- *   'base_theme'. Unlike regular hooks that can only be implemented by modules,
- *   each of these can implement hook_theme(). _theme_process_registry() is
- *   called in aforementioned order and new entries override older ones. For
- *   example, if a theme hook is both defined by a module and a theme, then the
- *   definition in the theme will be used.
- * @param $theme
- *   The loaded $theme object as returned from list_themes().
- * @param $path
- *   The directory where $name is. For example, modules/system or
- *   themes/garland.
+ * Because $cache is a reference, the cache will be continually
+ * expanded upon; new entries will replace old entries in the
+ * array_merge, but we are careful to ensure some data is carried
+ * forward, such as the arguments a theme hook needs.
  *
- * @see theme()
- * @see _theme_process_registry()
- * @see hook_theme()
- * @see list_themes()
+ * An override flag can be set for preprocess functions. When detected the
+ * cached preprocessors for the hook will not be merged with the newly set.
+ * This can be useful to themes and theme engines by giving them more control
+ * over how and when the preprocess functions are run.
  */
 function _theme_process_registry(&$cache, $name, $type, $theme, $path) {
   $result = array();
-  $function = $name . '_theme';
-
-  // Template functions work in two distinct phases with the process
-  // functions always being executed after the preprocess functions.
-  $template_phases = array(
-    'preprocess functions' => 'preprocess',
-    'process functions'    => 'process',
-  );
-
+  $function = $name .'_theme';
   if (function_exists($function)) {
     $result = $function($cache, $type, $theme, $path);
 
@@ -329,7 +271,7 @@ function _theme_process_registry(&$cache, $name, $type, $theme, $path) {
       // if function and file are left out, default to standard naming
       // conventions.
       if (!isset($info['template']) && !isset($info['function'])) {
-        $result[$hook]['function'] = ($type == 'module' ? 'theme_' : $name . '_') . $hook;
+        $result[$hook]['function'] = ($type == 'module' ? 'theme_' : $name .'_') . $hook;
       }
       // If a path is set in the info, use what was set. Otherwise use the
       // default path. This is mostly so system.module can declare theme
@@ -337,112 +279,112 @@ function _theme_process_registry(&$cache, $name, $type, $theme, $path) {
       // All files are included to be safe. Conditionally included
       // files can prevent them from getting registered.
       if (isset($info['file']) && !isset($info['path'])) {
-        $result[$hook]['file'] = $path . '/' . $info['file'];
-        include_once DRUPAL_ROOT . '/' . $result[$hook]['file'];
+        $result[$hook]['file'] = $path .'/'. $info['file'];
+        include_once($result[$hook]['file']);
       }
       elseif (isset($info['file']) && isset($info['path'])) {
-        include_once DRUPAL_ROOT . '/' . $info['path'] . '/' . $info['file'];
+        include_once($info['path'] .'/'. $info['file']);
       }
 
+      if (isset($info['template']) && !isset($info['path'])) {
+        $result[$hook]['template'] = $path .'/'. $info['template'];
+      }
       // If 'arguments' have been defined previously, carry them forward.
       // This should happen if a theme overrides a Drupal defined theme
       // function, for example.
       if (!isset($info['arguments']) && isset($cache[$hook])) {
         $result[$hook]['arguments'] = $cache[$hook]['arguments'];
       }
+      // Likewise with theme paths. These are used for template naming suggestions.
+      // Theme implementations can occur in multiple paths. Suggestions should follow.
+      if (!isset($info['theme paths']) && isset($cache[$hook])) {
+        $result[$hook]['theme paths'] = $cache[$hook]['theme paths'];
+      }
+      // Check for sub-directories.
+      $result[$hook]['theme paths'][] = isset($info['path']) ? $info['path'] : $path;
 
-      // The following apply only to theming hooks implemented as templates.
-      if (isset($info['template'])) {
-        // Prepend the current theming path when none is set.
-        if (!isset($info['path'])) {
-          $result[$hook]['template'] = $path . '/' . $info['template'];
+      // Check for default _preprocess_ functions. Ensure arrayness.
+      if (!isset($info['preprocess functions']) || !is_array($info['preprocess functions'])) {
+        $info['preprocess functions'] = array();
+        $prefixes = array();
+        if ($type == 'module') {
+          // Default preprocessor prefix.
+          $prefixes[] = 'template';
+          // Add all modules so they can intervene with their own preprocessors. This allows them
+          // to provide preprocess functions even if they are not the owner of the current hook.
+          $prefixes += module_list();
+        }
+        elseif ($type == 'theme_engine' || $type == 'base_theme_engine') {
+          // Theme engines get an extra set that come before the normally named preprocessors.
+          $prefixes[] = $name .'_engine';
+          // The theme engine also registers on behalf of the theme. The theme or engine name can be used.
+          $prefixes[] = $name;
+          $prefixes[] = $theme;
+        }
+        else {
+          // This applies when the theme manually registers their own preprocessors.
+          $prefixes[] = $name;
         }
 
-        // These are used for template naming suggestions. Theme implementations
-        // can occur in multiple paths. Suggestions should follow.
-        if (!isset($info['theme paths']) && isset($cache[$hook])) {
-          $result[$hook]['theme paths'] = $cache[$hook]['theme paths'];
-        }
-        // Check for sub-directories.
-        $result[$hook]['theme paths'][] = isset($info['path']) ? $info['path'] : $path;
+        foreach ($prefixes as $prefix) {
+          if (function_exists($prefix .'_preprocess')) {
+            $info['preprocess functions'][] = $prefix .'_preprocess';
+          }
 
-        foreach ($template_phases as $phase_key => $template_phase) {
-          // Check for existing variable processors. Ensure arrayness.
-          if (!isset($info[$phase_key]) || !is_array($info[$phase_key])) {
-            $info[$phase_key] = array();
-            $prefixes = array();
-            if ($type == 'module') {
-              // Default variable processor prefix.
-              $prefixes[] = 'template';
-              // Add all modules so they can intervene with their own variable processors. This allows them
-              // to provide variable processors even if they are not the owner of the current hook.
-              $prefixes += module_list();
-            }
-            elseif ($type == 'theme_engine' || $type == 'base_theme_engine') {
-              // Theme engines get an extra set that come before the normally named variable processors.
-              $prefixes[] = $name . '_engine';
-              // The theme engine registers on behalf of the theme using the theme's name.
-              $prefixes[] = $theme;
-            }
-            else {
-              // This applies when the theme manually registers their own variable processors.
-              $prefixes[] = $name;
-            }
-            foreach ($prefixes as $prefix) {
-              if (function_exists($prefix . '_' . $template_phase)) {
-                $info[$phase_key][] = $prefix . '_' . $template_phase;
-              }
-              if (function_exists($prefix . '_' . $template_phase . '_' . $hook)) {
-                $info[$phase_key][] = $prefix . '_' . $template_phase . '_' . $hook;
-              }
-            }
+          if (function_exists($prefix .'_preprocess_'. $hook)) {
+            $info['preprocess functions'][] = $prefix .'_preprocess_'. $hook;
           }
-          // Check for the override flag and prevent the cached variable processors from being used.
-          // This allows themes or theme engines to remove variable processors set earlier in the registry build.
-          if (!empty($info['override ' . $phase_key])) {
-            // Flag not needed inside the registry.
-            unset($result[$hook]['override ' . $phase_key]);
+
+          if (!empty($info['original hook']) && function_exists($prefix .'_preprocess_'. $info['original hook'])) {
+            $info['preprocess functions'][] = $prefix .'_preprocess_'. $info['original hook'];
           }
-          elseif (isset($cache[$hook][$phase_key]) && is_array($cache[$hook][$phase_key])) {
-            $info[$phase_key] = array_merge($cache[$hook][$phase_key], $info[$phase_key]);
-          }
-          $result[$hook][$phase_key] = $info[$phase_key];
         }
       }
+      // Check for the override flag and prevent the cached preprocess functions from being used.
+      // This allows themes or theme engines to remove preprocessors set earlier in the registry build.
+      if (!empty($info['override preprocess functions'])) {
+        // Flag not needed inside the registry.
+        unset($result[$hook]['override preprocess functions']);
+      }
+      elseif (isset($cache[$hook]['preprocess functions']) && is_array($cache[$hook]['preprocess functions'])) {
+        $info['preprocess functions'] = array_merge($cache[$hook]['preprocess functions'], $info['preprocess functions']);
+      }
+      elseif (isset($info['original hook']) && isset($cache[$info['original hook']]['preprocess functions']) && is_array($cache[$info['original hook']]['preprocess functions'])) {
+        $info['preprocess functions'] = array_merge($cache[$info['original hook']]['preprocess functions'], $info['preprocess functions']);
+      }
+      $result[$hook]['preprocess functions'] = $info['preprocess functions'];
     }
 
     // Merge the newly created theme hooks into the existing cache.
     $cache = array_merge($cache, $result);
   }
 
-  // Let themes have variable processors even if they didn't register a template.
+  // Let themes have preprocess functions even if they didn't register a template.
   if ($type == 'theme' || $type == 'base_theme') {
     foreach ($cache as $hook => $info) {
       // Check only if it's a template and not registered by the theme or engine.
       if (!empty($info['template']) && empty($result[$hook])) {
-        foreach ($template_phases as $phase_key => $template_phase) {
-          if (!isset($info[$phase_key])) {
-            $cache[$hook][$phase_key] = array();
-          }
-          if (function_exists($name . '_' . $template_phase)) {
-            $cache[$hook][$phase_key][] = $name . '_' . $template_phase;
-          }
-          if (function_exists($name . '_' . $template_phase . '_' . $hook)) {
-            $cache[$hook][$phase_key][] = $name . '_' . $template_phase . '_' . $hook;
-          }
-          // Ensure uniqueness.
-          $cache[$hook][$phase_key] = array_unique($cache[$hook][$phase_key]);
+        if (!isset($info['preprocess functions'])) {
+          $cache[$hook]['preprocess functions'] = array();
         }
+        if (function_exists($name .'_preprocess')) {
+          $cache[$hook]['preprocess functions'][] = $name .'_preprocess';
+        }
+        if (function_exists($name .'_preprocess_'. $hook)) {
+          $cache[$hook]['preprocess functions'][] = $name .'_preprocess_'. $hook;
+        }
+        // Ensure uniqueness.
+        $cache[$hook]['preprocess functions'] = array_unique($cache[$hook]['preprocess functions']);
       }
     }
   }
 }
 
 /**
- * Rebuild the theme registry cache.
+ * Rebuild the hook theme_registry cache.
  *
  * @param $theme
- *   The loaded $theme object as returned by list_themes().
+ *   The loaded $theme object.
  * @param $base_theme
  *   An array of loaded $theme objects representing the ancestor themes in
  *   oldest first order.
@@ -481,29 +423,15 @@ function _theme_build_registry($theme, $base_theme, $theme_engine) {
 }
 
 /**
- * Return a list of all currently available themes.
+ * Provides a list of currently available themes.
  *
- * Retrieved from the database, if available and the site is not in maintenance
- * mode; otherwise compiled freshly from the filesystem.
+ * If the database is active then it will be retrieved from the database.
+ * Otherwise it will retrieve a new list.
  *
  * @param $refresh
- *   Whether to reload the list of themes from the database. Defaults to FALSE.
+ *   Whether to reload the list of themes from the database.
  * @return
- *   An associative array of the currently available themes. The keys are the
- *   names of the themes and the values are objects having the following
- *   properties:
- *   - 'filename': The name of the .info file.
- *   - 'name': The name of the theme.
- *   - 'status': 1 for enabled, 0 for disabled themes.
- *   - 'info': The contents of the .info file.
- *   - 'stylesheets': A two dimensional array, using the first key for the
- *     'media' attribute (e.g. 'all'), the second for the name of the file
- *     (e.g. style.css). The value is a complete filepath
- *     (e.g. themes/garland/style.css).
- *   - 'scripts': An associative array of JavaScripts, using the filename as key
- *     and the complete filepath as value.
- *   - 'engine': The name of the theme engine.
- *   - 'base theme': The name of the base theme.
+ *   An array of the currently available themes.
  */
 function list_themes($refresh = FALSE) {
   static $list = array();
@@ -518,8 +446,8 @@ function list_themes($refresh = FALSE) {
     // Extract from the database only when it is available.
     // Also check that the site is not in the middle of an install or update.
     if (db_is_active() && !defined('MAINTENANCE_MODE')) {
-      $result = db_query("SELECT * FROM {system} WHERE type = :theme", array(':theme' => 'theme'));
-      foreach ($result as $theme) {
+      $result = db_query("SELECT * FROM {system} WHERE type = '%s'", 'theme');
+      while ($theme = db_fetch_object($result)) {
         if (file_exists($theme->filename)) {
           $theme->info = unserialize($theme->info);
           $themes[] = $theme;
@@ -528,7 +456,7 @@ function list_themes($refresh = FALSE) {
     }
     else {
       // Scan the installation when the database should not be read.
-      $themes = _system_get_theme_data();
+      $themes = _system_theme_data();
     }
 
     foreach ($themes as $theme) {
@@ -575,8 +503,7 @@ function list_themes($refresh = FALSE) {
  * $variables array. This array is then modified by the module implementing
  * the hook, theme engine (if applicable) and the theme. The following
  * functions may be used to modify the $variables array. They are processed in
- * two distinct phases; "preprocess" and "process" functions. The order it is
- * listed here is the order in which it will execute.
+ * this order when available:
  *
  * - template_preprocess(&$variables)
  *   This sets a default set of variables for all template implementations.
@@ -604,64 +531,28 @@ function list_themes($refresh = FALSE) {
  *   This is the same as the previous function, but it is called for a single
  *   theming hook.
  *
- * - THEME_preprocess(&$variables)
- *   This is for themes that want to alter or provide extra variables. For
- *   example, if a theme named "foo" wanted to alter the $submitted variable for
- *   the hook "node" a preprocess function of foo_preprocess_node() can be
- *   created to intercept and alter the variable.
- *
- * - THEME_preprocess_HOOK(&$variables)
- *   The same applies from the previous function, but it is called for a
- *   specific hook.
- *
- * - template_process(&$variables)
- *   This sets a default set of variables for all template implementations.
- *
- * - template_process_HOOK(&$variables)
- *   This is the first processor called specific to the hook; it should be
- *   implemented by the module that registers it.
- *
- * - MODULE_process(&$variables)
- *   This will be called for all templates; it should only be used if there
- *   is a real need. It's purpose is similar to template_process().
- *
- * - MODULE_process_HOOK(&$variables)
- *   This is for modules that want to alter or provide extra variables for
- *   theming hooks not registered to itself. For example, if a module named
- *   "foo" wanted to alter the $submitted variable for the hook "node" a
- *   process function of foo_process_node() can be created to intercept
- *   and alter the variable.
- *
- * - ENGINE_engine_process(&$variables)
- *   This function should only be implemented by theme engines and exists
- *   so that it can set necessary variables for all hooks.
- *
- * - ENGINE_engine_process_HOOK(&$variables)
- *   This is the same as the previous function, but it is called for a single
- *   theming hook.
- *
- * - ENGINE_process(&$variables)
+ * - ENGINE_preprocess(&$variables)
  *   This is meant to be used by themes that utilize a theme engine. It is
- *   provided so that the processor is not locked into a specific theme.
+ *   provided so that the preprocessor is not locked into a specific theme.
  *   This makes it easy to share and transport code but theme authors must be
  *   careful to prevent fatal re-declaration errors when using sub-themes that
- *   have their own processor named exactly the same as its base theme. In
+ *   have their own preprocessor named exactly the same as its base theme. In
  *   the default theme engine (PHPTemplate), sub-themes will load their own
  *   template.php file in addition to the one used for its parent theme. This
  *   increases the risk for these errors. A good practice is to use the engine
  *   name for the base theme and the theme name for the sub-themes to minimize
  *   this possibility.
  *
- * - ENGINE_process_HOOK(&$variables)
+ * - ENGINE_preprocess_HOOK(&$variables)
  *   The same applies from the previous function, but it is called for a
  *   specific hook.
  *
- * - THEME_process(&$variables)
+ * - THEME_preprocess(&$variables)
  *   These functions are based upon the raw theme; they should primarily be
  *   used by themes that do not use an engine or by sub-themes. It serves the
- *   same purpose as ENGINE_process().
+ *   same purpose as ENGINE_preprocess().
  *
- * - THEME_process_HOOK(&$variables)
+ * - THEME_preprocess_HOOK(&$variables)
  *   The same applies from the previous function, but it is called for a
  *   specific hook.
  *
@@ -711,32 +602,19 @@ function theme() {
   global $theme_path;
   $temp = $theme_path;
   // point path_to_theme() to the currently used theme path:
-  $theme_path = $info['theme path'];
+  $theme_path = $hooks[$hook]['theme path'];
 
-  // Include a file if the theme function or variable processor is held elsewhere.
+  // Include a file if the theme function or preprocess function is held elsewhere.
   if (!empty($info['file'])) {
     $include_file = $info['file'];
     if (isset($info['path'])) {
-      $include_file = $info['path'] . '/' . $include_file;
+      $include_file = $info['path'] .'/'. $include_file;
     }
-    include_once DRUPAL_ROOT . '/' . $include_file;
+    include_once($include_file);
   }
   if (isset($info['function'])) {
     // The theme call is a function.
-    if (drupal_function_exists($info['function'])) {
-      // If a theme function that does not expect a renderable array is called
-      // with a renderable array as the only argument (via drupal_render), then
-      // we take the arguments from the properties of the renderable array. If
-      // missing, use hook_theme() defaults.
-      if (isset($args[0]) && is_array($args[0]) && isset($args[0]['#theme']) && count($info['arguments']) > 1) {
-        $new_args = array();
-        foreach ($info['arguments'] as $name => $default) {
-          $new_args[] = isset($args[0]["#$name"]) ? $args[0]["#$name"] : $default;
-        }
-        $args = $new_args;
-      }
-      $output = call_user_func_array($info['function'], $args);
-    }
+    $output = call_user_func_array($info['function'], $args);
   }
   else {
     // The theme call is a template.
@@ -760,25 +638,24 @@ function theme() {
     if (isset($theme_engine)) {
       // If theme or theme engine is implementing this, it may have
       // a different extension and a different renderer.
-      if ($info['type'] != 'module') {
-        if (function_exists($theme_engine . '_render_template')) {
-          $render_function = $theme_engine . '_render_template';
+      if ($hooks[$hook]['type'] != 'module') {
+        if (function_exists($theme_engine .'_render_template')) {
+          $render_function = $theme_engine .'_render_template';
         }
-        $extension_function = $theme_engine . '_extension';
+        $extension_function = $theme_engine .'_extension';
         if (function_exists($extension_function)) {
           $extension = $extension_function();
         }
       }
     }
 
-    // This construct ensures that we can keep a reference through
-    // call_user_func_array.
-    $args = array(&$variables, $hook);
-    // Template functions in two phases.
-    foreach (array('preprocess functions', 'process functions') as $template_phase) {
-      foreach ($info[$template_phase] as $template_function) {
-        if (drupal_function_exists($template_function)) {
-          call_user_func_array($template_function, $args);
+    if (isset($info['preprocess functions']) && is_array($info['preprocess functions'])) {
+      // This construct ensures that we can keep a reference through
+      // call_user_func_array.
+      $args = array(&$variables, $hook);
+      foreach ($info['preprocess functions'] as $preprocess_function) {
+        if (function_exists($preprocess_function)) {
+          call_user_func_array($preprocess_function, $args);
         }
       }
     }
@@ -801,42 +678,26 @@ function theme() {
     }
 
     if (empty($template_file)) {
-      $template_file = $info['template'] . $extension;
-      if (isset($info['path'])) {
-        $template_file = $info['path'] . '/' . $template_file;
+      $template_file = $hooks[$hook]['template'] . $extension;
+      if (isset($hooks[$hook]['path'])) {
+        $template_file = $hooks[$hook]['path'] .'/'. $template_file;
       }
     }
     $output = $render_function($template_file, $variables);
   }
   // restore path_to_theme()
   $theme_path = $temp;
+  // Add final markup to the full page.
+  if ($hook == 'page' || $hook == 'book_export_html') {
+    $output = drupal_final_markup($output);
+  }
   return $output;
 }
 
 /**
- * Determine and return which template file will generate the output.
- *
- * This helper allows the theme system to pick the template at runtime instead
- * of build time.
- *
- * @see template_page_suggestions()
- * @see template_preprocess_block()
- *
- * @param $paths
- *   The paths where templates can be found. See _theme_process_registry()
- *   'theme paths' for more information.
- * @param $suggestions
- *   The possible template names. These are derived from
- *   $variables['template_files'] and $variables['template_file], defined by
- *   preprocess functions. Each file is checked on every path in the order of
- *   precedence defined by theme().
- * @return
- *   The filepath to the template that will generate the output. If none is
- *   found, then theme() will use the 'template' as set by
- *   _theme_process_registry().
- *
- * @see _theme_process_registry()
- * @see theme()
+ * Choose which template file to actually render. These are all suggested
+ * templates from themes and modules. Theming implementations can occur on
+ * multiple levels. All paths are checked to account for this.
  */
 function drupal_discover_template($paths, $suggestions, $extension = '.tpl.php') {
   global $theme_engine;
@@ -852,7 +713,7 @@ function drupal_discover_template($paths, $suggestions, $extension = '.tpl.php')
     if (!empty($suggestion)) {
       $suggestion = str_replace(array("/", "\\", "\0"), '', $suggestion);
       foreach ($paths as $path) {
-        if (file_exists($file = $path . '/' . $suggestion . $extension)) {
+        if (file_exists($file = $path .'/'. $suggestion . $extension)) {
           return $file;
         }
       }
@@ -899,20 +760,21 @@ function drupal_find_theme_functions($cache, $prefixes) {
   foreach ($cache as $hook => $info) {
     foreach ($prefixes as $prefix) {
       if (!empty($info['pattern'])) {
-        $matches = preg_grep('/^' . $prefix . '_' . $info['pattern'] . '/', $functions['user']);
+        $matches = preg_grep('/^'. $prefix .'_'. $info['pattern'] .'/', $functions['user']);
         if ($matches) {
           foreach ($matches as $match) {
-            $new_hook = str_replace($prefix . '_', '', $match);
+            $new_hook = str_replace($prefix .'_', '', $match);
             $templates[$new_hook] = array(
               'function' => $match,
               'arguments' => $info['arguments'],
+              'original hook' => $hook,
             );
           }
         }
       }
-      if (function_exists($prefix . '_' . $hook)) {
+      if (function_exists($prefix .'_'. $hook)) {
         $templates[$hook] = array(
-          'function' => $prefix . '_' . $hook,
+          'function' => $prefix .'_'. $hook,
         );
         // Ensure that the pattern is maintained from base themes to its sub-themes.
         // Each sub-theme will have their functions scanned so the pattern must be
@@ -961,13 +823,13 @@ function drupal_find_theme_templates($cache, $extension, $path) {
   $subtheme_paths = isset($theme_paths[$theme]) ? $theme_paths[$theme] : array();
 
   // Escape the periods in the extension.
-  $regex = '/' . str_replace('.', '\.', $extension) . '$/';
+  $regex = str_replace('.', '\.', $extension) .'$';
   // Because drupal_system_listing works the way it does, we check for real
   // templates separately from checking for patterns.
   $files = drupal_system_listing($regex, $path, 'name', 0);
   foreach ($files as $template => $file) {
     // Ignore sub-theme templates for the current theme.
-    if (strpos($file->filepath, str_replace($subtheme_paths, '', $file->filepath)) !== 0) {
+    if (strpos($file->filename, str_replace($subtheme_paths, '', $file->filename)) !== 0) {
       continue;
     }
     // Chop off the remaining extensions if there are any. $template already
@@ -982,7 +844,7 @@ function drupal_find_theme_templates($cache, $extension, $path) {
     if (isset($cache[$hook])) {
       $templates[$hook] = array(
         'template' => $template,
-        'path' => dirname($file->filepath),
+        'path' => dirname($file->filename),
       );
     }
     // Ensure that the pattern is maintained from base themes to its sub-themes.
@@ -1001,15 +863,16 @@ function drupal_find_theme_templates($cache, $extension, $path) {
       // for the purposes of searching.
       $pattern = strtr($info['pattern'], '_', '-');
 
-      $matches = preg_grep('/^' . $pattern . '/', $patterns);
+      $matches = preg_grep('/^'. $pattern .'/', $patterns);
       if ($matches) {
         foreach ($matches as $match) {
           $file = substr($match, 0, strpos($match, '.'));
           // Put the underscores back in for the hook name and register this pattern.
           $templates[strtr($file, '-', '_')] = array(
             'template' => $file,
-            'path' => dirname($files[$match]->filepath),
+            'path' => dirname($files[$match]->filename),
             'arguments' => $info['arguments'],
+            'original hook' => $hook,
           );
         }
       }
@@ -1037,33 +900,39 @@ function drupal_find_theme_templates($cache, $extension, $path) {
  */
 function theme_get_settings($key = NULL) {
   $defaults = array(
-    'default_logo'                     =>  1,
-    'logo_path'                        =>  '',
-    'default_favicon'                  =>  1,
-    'favicon_path'                     =>  '',
-    'main_menu'                        =>  1,
-    'secondary_menu'                   =>  1,
-    'toggle_logo'                      =>  1,
-    'toggle_favicon'                   =>  1,
-    'toggle_name'                      =>  1,
-    'toggle_search'                    =>  0,
-    'toggle_slogan'                    =>  0,
-    'toggle_node_user_picture'         =>  0,
-    'toggle_comment_user_picture'      =>  0,
-    'toggle_comment_user_verification' =>  1,
-    'toggle_main_menu'                 =>  1,
-    'toggle_secondary_menu'            =>  1,
+    'mission'                       =>  '',
+    'default_logo'                  =>  1,
+    'logo_path'                     =>  '',
+    'default_favicon'               =>  1,
+    'favicon_path'                  =>  '',
+    'primary_links'                 =>  1,
+    'secondary_links'               =>  1,
+    'toggle_logo'                   =>  1,
+    'toggle_favicon'                =>  1,
+    'toggle_name'                   =>  1,
+    'toggle_search'                 =>  1,
+    'toggle_slogan'                 =>  0,
+    'toggle_mission'                =>  1,
+    'toggle_node_user_picture'      =>  0,
+    'toggle_comment_user_picture'   =>  0,
+    'toggle_primary_links'          =>  1,
+    'toggle_secondary_links'        =>  1,
   );
 
+  if (module_exists('node')) {
+    foreach (node_get_types() as $type => $name) {
+      $defaults['toggle_node_info_'. $type] = 1;
+    }
+  }
   $settings = array_merge($defaults, variable_get('theme_settings', array()));
 
   if ($key) {
-    $settings = array_merge($settings, variable_get(str_replace('/', '_', 'theme_' . $key . '_settings'), array()));
+    $settings = array_merge($settings, variable_get(str_replace('/', '_', 'theme_'. $key .'_settings'), array()));
   }
 
   // Only offer search box if search.module is enabled.
-  if (!defined('MAINTENANCE_MODE') && module_exists('search') && user_access('search content')) {
-    $settings['toggle_search'] = 1;
+  if (!module_exists('search') || !user_access('search content')) {
+    $settings['toggle_search'] = 0;
   }
 
   return $settings;
@@ -1095,9 +964,17 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
     $themes = list_themes();
     $theme_object = $themes[$theme_key];
 
+    if ($settings['mission'] == '') {
+      $settings['mission'] = variable_get('site_mission', '');
+    }
+
+    if (!$settings['toggle_mission']) {
+      $settings['mission'] = '';
+    }
+
     if ($settings['toggle_logo']) {
       if ($settings['default_logo']) {
-        $settings['logo'] = base_path() . dirname($theme_object->filename) . '/logo.png';
+        $settings['logo'] = base_path() . dirname($theme_object->filename) .'/logo.png';
       }
       elseif ($settings['logo_path']) {
         $settings['logo'] = base_path() . $settings['logo_path'];
@@ -1106,11 +983,11 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
 
     if ($settings['toggle_favicon']) {
       if ($settings['default_favicon']) {
-        if (file_exists($favicon = dirname($theme_object->filename) . '/favicon.ico')) {
+        if (file_exists($favicon = dirname($theme_object->filename) .'/favicon.ico')) {
           $settings['favicon'] = base_path() . $favicon;
         }
         else {
-          $settings['favicon'] = base_path() . 'misc/favicon.ico';
+          $settings['favicon'] = base_path() .'misc/favicon.ico';
         }
       }
       elseif ($settings['favicon_path']) {
@@ -1130,7 +1007,7 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
  *
  * @param $template_file
  *   The filename of the template to render. Note that this will overwrite
- *   anything stored in $variables['template_file'] if using a variable processor hook.
+ *   anything stored in $variables['template_file'] if using a preprocess hook.
  * @param $variables
  *   A keyed array of variables that will appear in the output.
  *
@@ -1138,12 +1015,12 @@ function theme_get_setting($setting_name, $refresh = FALSE) {
  *   The output generated by the template.
  */
 function theme_render_template($template_file, $variables) {
-  extract($variables, EXTR_SKIP);               // Extract the variables to a local namespace
-  ob_start();                                   // Start output buffering
-  include DRUPAL_ROOT . '/' . $template_file;   // Include the template file
-  $contents = ob_get_contents();                // Get the contents of the buffer
-  ob_end_clean();                               // End buffering and discard
-  return $contents;                             // Return the contents
+  extract($variables, EXTR_SKIP);  // Extract the variables to a local namespace
+  ob_start();                      // Start output buffering
+  include "./$template_file";      // Include the template file
+  $contents = ob_get_contents();   // Get the contents of the buffer
+  ob_end_clean();                  // End buffering and discard
+  return $contents;                // Return the contents
 }
 
 /**
@@ -1192,17 +1069,19 @@ function theme_render_template($template_file, $variables) {
  * Drupal and implemented in phptemplate.engine, which uses Drupal's default
  * template renderer.
  *
- * In order to create theme-specific implementations of these hooks, themes can
- * implement their own version of theme hooks, either as functions or templates.
- * These implementations will be used instead of the default implementation. If
- * using a pure .theme without an engine, the .theme is required to implement
- * its own version of hook_theme() to tell Drupal what it is implementing;
- * themes utilizing an engine will have their well-named theming functions
- * automatically registered for them. While this can vary based upon the theme
- * engine, the standard set by phptemplate is that theme functions should be
- * named THEMENAME_HOOK. For example, for Drupal's default theme (Garland) to
- * implement the 'table' hook, the phptemplate.engine would find
- * garland_table().
+ * In order to create theme-specific implementations of these hooks,
+ * themes can implement their own version of theme hooks, either as functions
+ * or templates. These implementations will be used instead of the default
+ * implementation. If using a pure .theme without an engine, the .theme is
+ * required to implement its own version of hook_theme() to tell Drupal what
+ * it is implementing; themes utilizing an engine will have their well-named
+ * theming functions automatically registered for them. While this can vary
+ * based upon the theme engine, the standard set by phptemplate is that theme
+ * functions should be named either phptemplate_HOOK or THEMENAME_HOOK. For
+ * example, for Drupal's default theme (Garland) to implement the 'table' hook,
+ * the phptemplate.engine would find phptemplate_table() or garland_table().
+ * The ENGINE_HOOK() syntax is preferred, as this can be used by sub-themes
+ * (which are themes that share code but use different stylesheets).
  *
  * The theme system is described and defined in theme.inc.
  *
@@ -1220,7 +1099,7 @@ function theme_render_template($template_file, $variables) {
  *   The formatted text (html).
  */
 function theme_placeholder($text) {
-  return '<em>' . check_plain($text) . '</em>';
+  return '<em>'. check_plain($text) .'</em>';
 }
 
 /**
@@ -1240,7 +1119,7 @@ function theme_status_messages($display = NULL) {
     if (count($messages) > 1) {
       $output .= " <ul>\n";
       foreach ($messages as $message) {
-        $output .= '  <li>' . $message . "</li>\n";
+        $output .= '  <li>'. $message ."</li>\n";
       }
       $output .= " </ul>\n";
     }
@@ -1256,14 +1135,9 @@ function theme_status_messages($display = NULL) {
  * Return a themed set of links.
  *
  * @param $links
- *   A keyed array of links to be themed. The key for each link is used as its css class.
- *   Each link should be itself an array, with the following keys:
- *    - title: the link text
- *    - href: the link URL. If omitted, the 'title' is shown as a plain text item in the links list.
- *    - html: (optional) set this to TRUE if 'title' is HTML so it will be escaped.
- *   Array items are passed on to the l() function's $options parameter when creating the link.
+ *   A keyed array of links to be themed.
  * @param $attributes
- *   A keyed array of attributes.
+ *   A keyed array of attributes
  * @return
  *   A string containing an unordered list of links.
  */
@@ -1272,7 +1146,7 @@ function theme_links($links, $attributes = array('class' => 'links')) {
   $output = '';
 
   if (count($links) > 0) {
-    $output = '<ul' . drupal_attributes($attributes) . '>';
+    $output = '<ul'. drupal_attributes($attributes) .'>';
 
     $num_links = count($links);
     $i = 1;
@@ -1291,14 +1165,14 @@ function theme_links($links, $attributes = array('class' => 'links')) {
           && (empty($link['language']) || $link['language']->language == $language->language)) {
         $class .= ' active';
       }
-      $output .= '<li' . drupal_attributes(array('class' => $class)) . '>';
+      $output .= '<li'. drupal_attributes(array('class' => $class)) .'>';
 
       if (isset($link['href'])) {
         // Pass in $link as $options, they share the same keys.
         $output .= l($link['title'], $link['href'], $link);
       }
-      elseif (!empty($link['title'])) {
-        // Some links are actually not links, but we wrap these in <span> for adding title and class attributes.
+      else if (!empty($link['title'])) {
+        // Some links are actually not links, but we wrap these in <span> for adding title and class attributes
         if (empty($link['html'])) {
           $link['title'] = check_plain($link['title']);
         }
@@ -1306,7 +1180,7 @@ function theme_links($links, $attributes = array('class' => 'links')) {
         if (isset($link['attributes'])) {
           $span_attributes = drupal_attributes($link['attributes']);
         }
-        $output .= '<span' . $span_attributes . '>' . $link['title'] . '</span>';
+        $output .= '<span'. $span_attributes .'>'. $link['title'] .'</span>';
       }
 
       $i++;
@@ -1339,7 +1213,7 @@ function theme_image($path, $alt = '', $title = '', $attributes = NULL, $getsize
   if (!$getsize || (is_file($path) && (list($width, $height, $type, $image_attributes) = @getimagesize($path)))) {
     $attributes = drupal_attributes($attributes);
     $url = (url($path) == $path) ? $path : (base_path() . $path);
-    return '<img src="' . check_url($url) . '" alt="' . check_plain($alt) . '" title="' . check_plain($title) . '" ' . (isset($image_attributes) ? $image_attributes : '') . $attributes . ' />';
+    return '<img src="'. check_url($url) .'" alt="'. check_plain($alt) .'" title="'. check_plain($title) .'" '. (isset($image_attributes) ? $image_attributes : '') . $attributes .' />';
   }
 }
 
@@ -1352,7 +1226,18 @@ function theme_image($path, $alt = '', $title = '', $attributes = NULL, $getsize
  */
 function theme_breadcrumb($breadcrumb) {
   if (!empty($breadcrumb)) {
-    return '<div class="breadcrumb">' . implode(' » ', $breadcrumb) . '</div>';
+    return '<div class="breadcrumb">'. implode(' » ', $breadcrumb) .'</div>';
+  }
+}
+
+/**
+ * Return a themed help message.
+ *
+ * @return a string containing the helptext for the current page.
+ */
+function theme_help() {
+  if ($help = menu_get_active_help()) {
+    return '<div class="help">'. $help .'</div>';
   }
 }
 
@@ -1363,7 +1248,7 @@ function theme_breadcrumb($breadcrumb) {
  *   An array of links.
  */
 function theme_submenu($links) {
-  return '<div class="submenu">' . implode(' | ', $links) . '</div>';
+  return '<div class="submenu">'. implode(' | ', $links) .'</div>';
 }
 
 /**
@@ -1406,96 +1291,29 @@ function theme_submenu($links) {
  *   An array of HTML attributes to apply to the table tag.
  * @param $caption
  *   A localized string to use for the <caption> tag.
- * @param $colgroups
- *   An array of column groups. Each element of the array can be either:
- *   - An array of columns, each of which is an associative array of HTML attributes
- *     applied to the COL element.
- *   - An array of attributes applied to the COLGROUP element, which must include a
- *     "data" attribute. To add attributes to COL elements, set the "data" attribute
- *     with an array of columns, each of which is an associative array of HTML attributes.
- *   Here's an example for $colgroup:
- *   @verbatim
- *   $colgroup = array(
- *     // COLGROUP with one COL element.
- *     array(
- *       array(
- *         'class' => 'funky', // Attribute for the COL element.
- *       ),
- *     ),
- *     // Colgroup with attributes and inner COL elements.
- *     array(
- *       'data' => array(
- *         array(
- *           'class' => 'funky', // Attribute for the COL element.
- *         ),
- *       ),
- *       'class' => 'jazzy', // Attribute for the COLGROUP element.
- *     ),
- *   );
- *   @endverbatim
- *   These optional tags are used to group and set properties on columns
- *   within a table. For example, one may easily group three columns and
- *   apply same background style to all.
- * @param $sticky
- *   Use a "sticky" table header.
  * @return
  *   An HTML string representing the table.
  */
-function theme_table($header, $rows, $attributes = array(), $caption = NULL, $colgroups = array(), $sticky = TRUE) {
+function theme_table($header, $rows, $attributes = array(), $caption = NULL) {
 
   // Add sticky headers, if applicable.
-  if (count($header) && $sticky) {
+  if (count($header)) {
     drupal_add_js('misc/tableheader.js');
     // Add 'sticky-enabled' class to the table to identify it for JS.
     // This is needed to target tables constructed by this function.
-    $attributes['class'] = empty($attributes['class']) ? 'sticky-enabled' : ($attributes['class'] . ' sticky-enabled');
+    $attributes['class'] = empty($attributes['class']) ? 'sticky-enabled' : ($attributes['class'] .' sticky-enabled');
   }
 
-  $output = '<table' . drupal_attributes($attributes) . ">\n";
+  $output = '<table'. drupal_attributes($attributes) .">\n";
 
   if (isset($caption)) {
-    $output .= '<caption>' . $caption . "</caption>\n";
-  }
-
-  // Format the table columns:
-  if (count($colgroups)) {
-    foreach ($colgroups as $number => $colgroup) {
-      $attributes = array();
-
-      // Check if we're dealing with a simple or complex column
-      if (isset($colgroup['data'])) {
-        foreach ($colgroup as $key => $value) {
-          if ($key == 'data') {
-            $cols = $value;
-          }
-          else {
-            $attributes[$key] = $value;
-          }
-        }
-      }
-      else {
-        $cols = $colgroup;
-      }
-
-      // Build colgroup
-      if (is_array($cols) && count($cols)) {
-        $output .= ' <colgroup' . drupal_attributes($attributes) . '>';
-        $i = 0;
-        foreach ($cols as $col) {
-          $output .= ' <col' . drupal_attributes($col) . ' />';
-        }
-        $output .= " </colgroup>\n";
-      }
-      else {
-        $output .= ' <colgroup' . drupal_attributes($attributes) . " />\n";
-      }
-    }
+    $output .= '<caption>'. $caption ."</caption>\n";
   }
 
   // Format the table header:
   if (count($header)) {
     $ts = tablesort_init($header);
-    // HTML requires that the thead tag has tr tags in it followed by tbody
+    // HTML requires that the thead tag has tr tags in it follwed by tbody
     // tags. Using ternary operator to check and see if we have any rows.
     $output .= (count($rows) ? ' <thead><tr>' : ' <tr>');
     foreach ($header as $cell) {
@@ -1535,14 +1353,14 @@ function theme_table($header, $rows, $attributes = array(), $caption = NULL, $co
         // Add odd/even class
         $class = $flip[$class];
         if (isset($attributes['class'])) {
-          $attributes['class'] .= ' ' . $class;
+          $attributes['class'] .= ' '. $class;
         }
         else {
           $attributes['class'] = $class;
         }
 
         // Build row
-        $output .= ' <tr' . drupal_attributes($attributes) . '>';
+        $output .= ' <tr'. drupal_attributes($attributes) .'>';
         $i = 0;
         foreach ($cells as $cell) {
           $cell = tablesort_cell($cell, $header, $ts, $i++);
@@ -1585,6 +1403,23 @@ function theme_tablesort_indicator($style) {
 }
 
 /**
+ * Return a themed box.
+ *
+ * @param $title
+ *   The subject of the box.
+ * @param $content
+ *   The content of the box.
+ * @param $region
+ *   The region in which the box is displayed.
+ * @return
+ *   A string containing the box output.
+ */
+function theme_box($title, $content, $region = 'main') {
+  $output = '<h2 class="title">'. $title .'</h2><div>'. $content .'</div>';
+  return $output;
+}
+
+/**
  * Return a themed marker, useful for marking new or updated
  * content.
  *
@@ -1598,10 +1433,10 @@ function theme_mark($type = MARK_NEW) {
   global $user;
   if ($user->uid) {
     if ($type == MARK_NEW) {
-      return ' <span class="marker">' . t('new') . '</span>';
+      return ' <span class="marker">'. t('new') .'</span>';
     }
-    elseif ($type == MARK_UPDATED) {
-      return ' <span class="marker">' . t('updated') . '</span>';
+    else if ($type == MARK_UPDATED) {
+      return ' <span class="marker">'. t('updated') .'</span>';
     }
   }
 }
@@ -1624,14 +1459,14 @@ function theme_mark($type = MARK_NEW) {
  * @return
  *   A string containing the list output.
  */
-function theme_item_list($items = array(), $title = NULL, $type = 'ul', $attributes = array()) {
+function theme_item_list($items = array(), $title = NULL, $type = 'ul', $attributes = NULL) {
   $output = '<div class="item-list">';
   if (isset($title)) {
-    $output .= '<h3>' . $title . '</h3>';
+    $output .= '<h3>'. $title .'</h3>';
   }
 
   if (!empty($items)) {
-    $output .= "<$type" . drupal_attributes($attributes) . '>';
+    $output .= "<$type". drupal_attributes($attributes) .'>';
     $num_items = count($items);
     foreach ($items as $i => $item) {
       $attributes = array();
@@ -1656,12 +1491,12 @@ function theme_item_list($items = array(), $title = NULL, $type = 'ul', $attribu
         $data .= theme_item_list($children, NULL, $type, $attributes); // Render nested list
       }
       if ($i == 0) {
-        $attributes['class'] = empty($attributes['class']) ? 'first' : ($attributes['class'] . ' first');
+        $attributes['class'] = empty($attributes['class']) ? 'first' : ($attributes['class'] .' first');
       }
       if ($i == $num_items - 1) {
-        $attributes['class'] = empty($attributes['class']) ? 'last' : ($attributes['class'] . ' last');
+        $attributes['class'] = empty($attributes['class']) ? 'last' : ($attributes['class'] .' last');
       }
-      $output .= '<li' . drupal_attributes($attributes) . '>' . $data . "</li>\n";
+      $output .= '<li'. drupal_attributes($attributes) .'>'. $data ."</li>\n";
     }
     $output .= "</$type>";
   }
@@ -1673,7 +1508,22 @@ function theme_item_list($items = array(), $title = NULL, $type = 'ul', $attribu
  * Returns code that emits the 'more help'-link.
  */
 function theme_more_help_link($url) {
-  return '<div class="more-help-link">' . t('<a href="@link">More help</a>', array('@link' => check_url($url))) . '</div>';
+  return '<div class="more-help-link">'. t('[<a href="@link">more help...</a>]', array('@link' => check_url($url))) .'</div>';
+}
+
+/**
+ * Return code that emits an XML icon.
+ *
+ * For most use cases, this function has been superseded by theme_feed_icon().
+ *
+ * @see theme_feed_icon()
+ * @param $url
+ *   The url of the feed.
+ */
+function theme_xml_icon($url) {
+  if ($image = theme('image', 'misc/xml.png', t('XML feed'), t('XML feed'))) {
+    return '<a href="'. check_url($url) .'" class="xml-icon">'. $image .'</a>';
+  }
 }
 
 /**
@@ -1686,7 +1536,7 @@ function theme_more_help_link($url) {
   */
 function theme_feed_icon($url, $title) {
   if ($image = theme('image', 'misc/feed.png', t('Syndicate content'), $title)) {
-    return '<a href="' . check_url($url) . '" class="feed-icon">' . $image . '</a>';
+    return '<a href="'. check_url($url) .'" class="feed-icon">'. $image .'</a>';
   }
 }
 
@@ -1699,7 +1549,7 @@ function theme_feed_icon($url, $title) {
  *   A descriptive verb for the link, like 'Read more'
  */
 function theme_more_link($url, $title) {
-  return '<div class="more-link">' . t('<a href="@link" title="@title">more</a>', array('@link' => check_url($url), '@title' => $title)) . '</div>';
+  return '<div class="more-link">'. t('<a href="@link" title="@title">more</a>', array('@link' => check_url($url), '@title' => $title)) .'</div>';
 }
 
 /**
@@ -1717,6 +1567,30 @@ function theme_closure($main = 0) {
 }
 
 /**
+ * Return a set of blocks available for the current user.
+ *
+ * @param $region
+ *   Which set of blocks to retrieve.
+ * @return
+ *   A string containing the themed blocks for this region.
+ */
+function theme_blocks($region) {
+  $output = '';
+
+  if ($list = block_list($region)) {
+    foreach ($list as $key => $block) {
+      // $key == <i>module</i>_<i>delta</i>
+      $output .= theme('block', $block);
+    }
+  }
+
+  // Add any content assigned to this region through drupal_set_content() calls.
+  $output .= drupal_get_content($region);
+
+  return $output;
+}
+
+/**
  * Format a username.
  *
  * @param $object
@@ -1730,20 +1604,20 @@ function theme_username($object) {
   if ($object->uid && $object->name) {
     // Shorten the name when it is too long or it will break many tables.
     if (drupal_strlen($object->name) > 20) {
-      $name = drupal_substr($object->name, 0, 15) . '...';
+      $name = drupal_substr($object->name, 0, 15) .'...';
     }
     else {
       $name = $object->name;
     }
 
     if (user_access('access user profiles')) {
-      $output = l($name, 'user/' . $object->uid, array('attributes' => array('title' => t('View user profile.'))));
+      $output = l($name, 'user/'. $object->uid, array('attributes' => array('title' => t('View user profile.'))));
     }
     else {
       $output = check_plain($name);
     }
   }
-  elseif ($object->name) {
+  else if ($object->name) {
     // Sometimes modules display content composed by people who are
     // not registered members of the site (e.g. mailing list or news
     // aggregator modules). This clause enables modules to display
@@ -1755,9 +1629,7 @@ function theme_username($object) {
       $output = check_plain($object->name);
     }
 
-    if (theme_get_setting('toggle_comment_user_verification')) {
-      $output .= ' (' . t('not verified') . ')';
-    }
+    $output .= ' ('. t('not verified') .')';
   }
   else {
     $output = check_plain(variable_get('anonymous', t('Anonymous')));
@@ -1778,9 +1650,9 @@ function theme_username($object) {
  */
 function theme_progress_bar($percent, $message) {
   $output = '<div id="progress" class="progress">';
-  $output .= '<div class="bar"><div class="filled" style="width: ' . $percent . '%"></div></div>';
-  $output .= '<div class="percentage">' . $percent . '%</div>';
-  $output .= '<div class="message">' . $message . '</div>';
+  $output .= '<div class="bar"><div class="filled" style="width: '. $percent .'%"></div></div>';
+  $output .= '<div class="percentage">'. $percent .'%</div>';
+  $output .= '<div class="message">'. $message .'</div>';
   $output .= '</div>';
 
   return $output;
@@ -1831,9 +1703,10 @@ function _theme_table_cell($cell, $header = FALSE) {
 }
 
 /**
- * Adds a default set of helper variables for variable processors and templates.
- * This comes in before any other preprocess function which makes it possible to
- * be used in default theme implementations (non-overriden theme functions).
+ * Adds a default set of helper variables for preprocess functions and
+ * templates. This comes in before any other preprocess function which makes
+ * it possible to be used in default theme implementations (non-overriden
+ * theme functions).
  */
 function template_preprocess(&$variables, $hook) {
   global $user;
@@ -1847,9 +1720,6 @@ function template_preprocess(&$variables, $hook) {
 
   // Tell all templates where they are located.
   $variables['directory'] = path_to_theme();
-
-  // Initialize html class attribute for the current hook.
-  $variables['classes_array'] = array($hook);
 
   // Set default variables that depend on the database.
   $variables['is_admin']            = FALSE;
@@ -1870,15 +1740,7 @@ function template_preprocess(&$variables, $hook) {
 }
 
 /**
- * A default process function used to alter variables as late as possible.
- */
-function template_process(&$variables, $hook) {
-  // Flatten out classes.
-  $variables['classes'] = implode(' ', $variables['classes_array']);
-}
-
-/**
- * Preprocess variables for page.tpl.php
+ * Process variables for page.tpl.php
  *
  * Most themes utilize their own copy of page.tpl.php. The default is located
  * inside "modules/system/page.tpl.php". Look in there for the full list of
@@ -1888,35 +1750,48 @@ function template_process(&$variables, $hook) {
  * based on the current path.
  *
  * Any changes to variables in this preprocessor should also be changed inside
- * template_preprocess_maintenance_page() to keep all of them consistent.
- * 
- * @see drupal_render_page
- * @see template_process_page
+ * template_preprocess_maintenance_page() to keep all them consistent.
+ *
+ * The $variables array contains the following arguments:
+ * - $content
+ * - $show_blocks
+ *
  * @see page.tpl.php
  */
 function template_preprocess_page(&$variables) {
-  // Move some variables to the top level for themer convenience and template cleanliness.
-  $variables['show_blocks'] = $variables['page']['#show_blocks'];
-  $variables['show_messages'] = $variables['page']['#show_messages'];
-
-  // Add favicon.
+  // Add favicon
   if (theme_get_setting('toggle_favicon')) {
-    $favicon = theme_get_setting('favicon');
-    $type = file_get_mimetype($favicon);
-    // Use the genereic MIME type for favicons if no other was found.
-    if ($type == 'application/octet-stream') {
-      $type = 'image/x-icon';
+    drupal_set_html_head('<link rel="shortcut icon" href="'. check_url(theme_get_setting('favicon')) .'" type="image/x-icon" />');
+  }
+
+  global $theme;
+  // Populate all block regions.
+  $regions = system_region_list($theme);
+  // Load all region content assigned via blocks.
+  foreach (array_keys($regions) as $region) {
+    // Prevent left and right regions from rendering blocks when 'show_blocks' == FALSE.
+    if (!(!$variables['show_blocks'] && ($region == 'left' || $region == 'right'))) {
+      $blocks = theme('blocks', $region);
     }
-    drupal_add_html_head('<link rel="shortcut icon" href="' . check_url($favicon) . '" type="' . check_plain($type) . '" />');
+    else {
+      $blocks = '';
+    }
+    // Assign region to a region variable.
+    isset($variables[$region]) ? $variables[$region] .= $blocks : $variables[$region] = $blocks;
   }
 
   // Set up layout variable.
   $variables['layout'] = 'none';
-  if (!empty($variables['page']['left'])) {
+  if (!empty($variables['left'])) {
     $variables['layout'] = 'left';
   }
-  if (!empty($variables['page']['right'])) {
+  if (!empty($variables['right'])) {
     $variables['layout'] = ($variables['layout'] == 'left') ? 'both' : 'right';
+  }
+
+  // Set mission when viewing the frontpage.
+  if (drupal_is_front_page()) {
+    $mission = filter_xss_admin(theme_get_setting('mission'));
   }
 
   // Construct page title
@@ -1934,22 +1809,24 @@ function template_preprocess_page(&$variables) {
   $variables['front_page']        = url();
   $variables['breadcrumb']        = theme('breadcrumb', drupal_get_breadcrumb());
   $variables['feed_icons']        = drupal_get_feeds();
+  $variables['footer_message']    = filter_xss_admin(variable_get('site_footer', FALSE));
+  $variables['head']              = drupal_get_html_head();
+  $variables['help']              = theme('help');
   $variables['language']          = $GLOBALS['language'];
   $variables['language']->dir     = $GLOBALS['language']->direction ? 'rtl' : 'ltr';
   $variables['logo']              = theme_get_setting('logo');
   $variables['messages']          = $variables['show_messages'] ? theme('status_messages') : '';
-  $variables['main_menu']         = theme_get_setting('toggle_main_menu') ? menu_main_menu() : array();
-  $variables['secondary_menu']    = theme_get_setting('toggle_secondary_menu') ? menu_secondary_menu() : array();
-  $variables['search_box']        = (theme_get_setting('toggle_search') ? drupal_render(drupal_get_form('search_theme_form')) : '');
+  $variables['mission']           = isset($mission) ? $mission : '';
+  $variables['primary_links']     = theme_get_setting('toggle_primary_links') ? menu_primary_links() : array();
+  $variables['secondary_links']   = theme_get_setting('toggle_secondary_links') ? menu_secondary_links() : array();
+  $variables['search_box']        = (theme_get_setting('toggle_search') ? drupal_get_form('search_theme_form') : '');
   $variables['site_name']         = (theme_get_setting('toggle_name') ? filter_xss_admin(variable_get('site_name', 'Drupal')) : '');
   $variables['site_slogan']       = (theme_get_setting('toggle_slogan') ? filter_xss_admin(variable_get('site_slogan', '')) : '');
+  $variables['css']               = drupal_add_css();
+  $variables['styles']            = drupal_get_css();
+  $variables['scripts']           = drupal_get_js();
   $variables['tabs']              = theme('menu_local_tasks');
   $variables['title']             = drupal_get_title();
-  // RDFa allows annotation of XHTML pages with RDF data, while GRDDL provides
-  // mechanisms for extraction of this RDF content via XSLT transformation
-  // using an associated GRDDL profile.
-  $variables['rdf_namespaces']    = drupal_get_rdf_namespaces();
-  $variables['grddl_profile']     = 'http://ns.inria.fr/grddl/rdfa/';
   // Closure should be filled last.
   $variables['closure']           = theme('closure');
 
@@ -1959,98 +1836,147 @@ function template_preprocess_page(&$variables) {
 
   // Compile a list of classes that are going to be applied to the body element.
   // This allows advanced theming based on context (home page, node of certain type, etc.).
+  $body_classes = array();
   // Add a class that tells us whether we're on the front page or not.
-  $variables['classes_array'][] = $variables['is_front'] ? 'front' : 'not-front';
+  $body_classes[] = $variables['is_front'] ? 'front' : 'not-front';
   // Add a class that tells us whether the page is viewed by an authenticated user or not.
-  $variables['classes_array'][] = $variables['logged_in'] ? 'logged-in' : 'not-logged-in';
-
-  // Populate the page template suggestions.
-  if ($suggestions = template_page_suggestions(arg())) {
-    $variables['template_files'] = $suggestions;
-    foreach ($suggestions as $suggestion) {
-      if ($suggestion != 'page-front') {
-        // Add current suggestion to page classes to make it possible to theme the page
-        // depending on the current page type (e.g. node, admin, user, etc.) as well as
-        // more specific data like node-12 or node-edit. To avoid illegal characters in
-        // the class, we're removing everything disallowed. We are not using 'a-z' as
-        //  that might leave in certain international characters (e.g. German umlauts).
-        $variables['classes_array'][] = preg_replace('![^abcdefghijklmnopqrstuvwxyz0-9-_]+!s', '', form_clean_id(drupal_strtolower($suggestion)));
-      }
-    }
-  }
-
-  // If on an individual node page, add the node type to body classes.
+  $body_classes[] = $variables['logged_in'] ? 'logged-in' : 'not-logged-in';
+  // Add arg(0) to make it possible to theme the page depending on the current page
+  // type (e.g. node, admin, user, etc.). To avoid illegal characters in the class,
+  // we're removing everything disallowed. We are not using 'a-z' as that might leave
+  // in certain international characters (e.g. German umlauts).
+  $body_classes[] = preg_replace('![^abcdefghijklmnopqrstuvwxyz0-9-_]+!s', '', 'page-'. form_clean_id(drupal_strtolower(arg(0))));
+  // If on an individual node page, add the node type.
   if (isset($variables['node']) && $variables['node']->type) {
-    $variables['classes_array'][] = 'node-type-' . form_clean_id($variables['node']->type);
+    $body_classes[] = 'node-type-'. form_clean_id($variables['node']->type);
   }
   // Add information about the number of sidebars.
   if ($variables['layout'] == 'both') {
-    $variables['classes_array'][] = 'two-sidebars';
+    $body_classes[] = 'two-sidebars';
   }
   elseif ($variables['layout'] == 'none') {
-    $variables['classes_array'][] = 'no-sidebars';
+    $body_classes[] = 'no-sidebars';
   }
   else {
-    $variables['classes_array'][] = 'one-sidebar sidebar-' . $variables['layout'];
+    $body_classes[] = 'one-sidebar sidebar-'. $variables['layout'];
   }
-}
-/**
- * Process variables for page.tpl.php
- *
- * Perform final addition and modification of variables before passing into 
- * the template. To customize these variables, call drupal_render() on elements 
- * in $variables['page'] during THEME_preprocess_page().
- *
- * @see template_preprocess_page()
- * @see page.tpl.php
- */
-function template_process_page(&$variables) {
-  // Render each region into top level variables.
-  foreach (system_region_list($GLOBALS['theme']) as $region_key => $region_name) {
-    $variables[$region_key] = drupal_render($variables['page'][$region_key]);
-  }
+  // Implode with spaces.
+  $variables['body_classes'] = implode(' ', $body_classes);
 
-  $variables['head']    = drupal_get_html_head();
-  $variables['css']     = drupal_add_css();
-  $variables['styles']  = drupal_get_css();
-  $variables['scripts'] = drupal_get_js();
-}
-
-/**
- * Generate an array of page template suggestions.
- *
- * @param $args
- *   An array of path arguments, such as from function arg().
- *
- * @return
- *   An array of suggested template files.
- */
-function template_page_suggestions($args) {
-
-  // Build a list of suggested template files and body classes in order of
-  // specificity. One suggestion is made for every element of the current path,
-  // though numeric elements are not carried to subsequent suggestions. For
-  // example, http://www.example.com/node/1/edit would result in the following
-  // suggestions and body classes:
+  // Build a list of suggested template files in order of specificity. One
+  // suggestion is made for every element of the current path, though
+  // numeric elements are not carried to subsequent suggestions. For example,
+  // http://www.example.com/node/1/edit would result in the following
+  // suggestions:
   //
-  // page-node-edit.tpl.php  page-node-edit
-  // page-node-1.tpl.php     page-node-1
-  // page-node.tpl.php       page-node
+  // page-node-edit.tpl.php
+  // page-node-1.tpl.php
+  // page-node.tpl.php
   // page.tpl.php
-
+  $i = 0;
   $suggestion = 'page';
   $suggestions = array();
-  foreach ($args as $arg) {
-    // Remove slashes or null per SA-CORE-2009-003.
+  while ($arg = arg($i++)) {
     $arg = str_replace(array("/", "\\", "\0"), '', $arg);
-    $suggestions[] = $suggestion . '-' . $arg;
+    $suggestions[] = $suggestion .'-'. $arg;
     if (!is_numeric($arg)) {
-      $suggestion .= '-' . $arg;
+      $suggestion .= '-'. $arg;
     }
   }
   if (drupal_is_front_page()) {
     $suggestions[] = 'page-front';
   }
 
-  return $suggestions;
+  if ($suggestions) {
+    $variables['template_files'] = $suggestions;
+  }
 }
+
+/**
+ * Process variables for node.tpl.php
+ *
+ * Most themes utilize their own copy of node.tpl.php. The default is located
+ * inside "modules/node/node.tpl.php". Look in there for the full list of
+ * variables.
+ *
+ * The $variables array contains the following arguments:
+ * - $node
+ * - $teaser
+ * - $page
+ *
+ * @see node.tpl.php
+ */
+function template_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  if (module_exists('taxonomy')) {
+    $variables['taxonomy'] = taxonomy_link('taxonomy terms', $node);
+  }
+  else {
+    $variables['taxonomy'] = array();
+  }
+
+  if ($variables['teaser'] && $node->teaser) {
+    $variables['content'] = $node->teaser;
+  }
+  elseif (isset($node->body)) {
+    $variables['content'] = $node->body;
+  }
+  else {
+    $variables['content'] = '';
+  }
+
+  $variables['date']      = format_date($node->created);
+  $variables['links']     = !empty($node->links) ? theme('links', $node->links, array('class' => 'links inline')) : '';
+  $variables['name']      = theme('username', $node);
+  $variables['node_url']  = url('node/'. $node->nid);
+  $variables['terms']     = theme('links', $variables['taxonomy'], array('class' => 'links inline'));
+  $variables['title']     = check_plain($node->title);
+
+  // Flatten the node object's member fields.
+  $variables = array_merge((array)$node, $variables);
+
+  // Display info only on certain node types.
+  if (theme_get_setting('toggle_node_info_'. $node->type)) {
+    $variables['submitted'] = theme('node_submitted', $node);
+    $variables['picture'] = theme_get_setting('toggle_node_user_picture') ? theme('user_picture', $node) : '';
+  }
+  else {
+    $variables['submitted'] = '';
+    $variables['picture'] = '';
+  }
+  // Clean up name so there are no underscores.
+  $variables['template_files'][] = 'node-'. $node->type;
+}
+
+/**
+ * Process variables for block.tpl.php
+ *
+ * Prepare the values passed to the theme_block function to be passed
+ * into a pluggable template engine. Uses block properties to generate a
+ * series of template file suggestions. If none are found, the default
+ * block.tpl.php is used.
+ *
+ * Most themes utilize their own copy of block.tpl.php. The default is located
+ * inside "modules/system/block.tpl.php". Look in there for the full list of
+ * variables.
+ *
+ * The $variables array contains the following arguments:
+ * - $block
+ *
+ * @see block.tpl.php
+ */
+function template_preprocess_block(&$variables) {
+  static $block_counter = array();
+  // All blocks get an independent counter for each region.
+  if (!isset($block_counter[$variables['block']->region])) {
+    $block_counter[$variables['block']->region] = 1;
+  }
+  // Same with zebra striping.
+  $variables['block_zebra'] = ($block_counter[$variables['block']->region] % 2) ? 'odd' : 'even';
+  $variables['block_id'] = $block_counter[$variables['block']->region]++;
+
+  $variables['template_files'][] = 'block-'. $variables['block']->region;
+  $variables['template_files'][] = 'block-'. $variables['block']->module;
+  $variables['template_files'][] = 'block-'. $variables['block']->module .'-'. $variables['block']->delta;
+}
+

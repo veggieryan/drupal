@@ -1,12 +1,12 @@
 <?php
-// $Id: search-results.tpl.php,v 1.3 2008/12/30 16:43:18 dries Exp $
+// $Id: search-results.tpl.php,v 1.1 2007/10/31 18:06:38 dries Exp $
 
 /**
- * @file
+ * @file search-results.tpl.php
  * Default theme implementation for displaying search results.
  *
  * This template collects each invocation of theme_search_result(). This and
- * the child template are dependent to one another sharing the markup for
+ * the child template are dependant to one another sharing the markup for
  * definition lists.
  *
  * Note that modules may implement their own search type and theme function

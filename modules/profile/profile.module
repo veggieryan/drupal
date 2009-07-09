@@ -1,5 +1,5 @@
 <?php
-// $Id: profile.module,v 1.261 2009/06/03 07:28:28 dries Exp $
+// $Id: profile.module,v 1.236.2.3 2009/01/12 10:09:19 goba Exp $
 
 /**
  * @file
@@ -27,29 +27,29 @@ define('PROFILE_PUBLIC_LISTINGS', 3);
 define('PROFILE_HIDDEN', 4);
 
 /**
- * Implement hook_help().
+ * Implementation of hook_help().
  */
 function profile_help($path, $arg) {
   switch ($path) {
     case 'admin/help#profile':
-      $output = '<p>' . t('The profile module allows custom fields (such as country, full name, or age) to be defined and displayed in the <em>My Account</em> section. This permits users of a site to share more information about themselves, and can help community-based sites organize users around specific information.') . '</p>';
-      $output .= '<p>' . t('The following types of fields can be added to a user profile:') . '</p>';
-      $output .= '<ul><li>' . t('single-line textfield') . '</li>';
-      $output .= '<li>' . t('multi-line textfield') . '</li>';
-      $output .= '<li>' . t('checkbox') . '</li>';
-      $output .= '<li>' . t('list selection') . '</li>';
-      $output .= '<li>' . t('freeform list') . '</li>';
-      $output .= '<li>' . t('URL') . '</li>';
-      $output .= '<li>' . t('date') . '</li></ul>';
-      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@profile">Profile module</a>.', array('@profile' => 'http://drupal.org/handbook/modules/profile/')) . '</p>';
+      $output = '<p>'. t('The profile module allows custom fields (such as country, full name, or age) to be defined and displayed in the <em>My Account</em> section. This permits users of a site to share more information about themselves, and can help community-based sites organize users around specific information.') .'</p>';
+      $output .= '<p>'. t('The following types of fields can be added to a user profile:') .'</p>';
+      $output .= '<ul><li>'. t('single-line textfield') .'</li>';
+      $output .= '<li>'. t('multi-line textfield') .'</li>';
+      $output .= '<li>'. t('checkbox') .'</li>';
+      $output .= '<li>'. t('list selection') .'</li>';
+      $output .= '<li>'. t('freeform list') .'</li>';
+      $output .= '<li>'. t('URL') .'</li>';
+      $output .= '<li>'. t('date') .'</li></ul>';
+      $output .= '<p>'. t('For more information, see the online handbook entry for <a href="@profile">Profile module</a>.', array('@profile' => 'http://drupal.org/handbook/modules/profile/')) .'</p>';
       return $output;
     case 'admin/user/profile':
-      return '<p>' . t("This page displays a list of the existing custom profile fields to be displayed on a user's <em>My Account</em> page. To provide structure, similar or related fields may be placed inside a category. To add a new category (or edit an existing one), edit a profile field and provide a new category name. To change the category of a field or the order of fields within a category, grab a drag-and-drop handle under the Title column and drag the field to a new location in the list. (Grab a handle by clicking and holding the mouse while hovering over a handle icon.) Remember that your changes will not be saved until you click the <em>Save configuration</em> button at the bottom of the page.") . '</p>';
+      return '<p>'. t("This page displays a list of the existing custom profile fields to be displayed on a user's <em>My Account</em> page. To provide structure, similar or related fields may be placed inside a category. To add a new category (or edit an existing one), edit a profile field and provide a new category name. To change the category of a field or the order of fields within a category, grab a drag-and-drop handle under the Title column and drag the field to a new location in the list. (Grab a handle by clicking and holding the mouse while hovering over a handle icon.) Remember that your changes will not be saved until you click the <em>Save configuration</em> button at the bottom of the page.") .'</p>';
   }
 }
 
 /**
- * Implement hook_theme().
+ * Implementation of hook_theme()
  */
 function profile_theme() {
   return array(
@@ -73,7 +73,7 @@ function profile_theme() {
 }
 
 /**
- * Implement hook_menu().
+ * Implementation of hook_menu().
  */
 function profile_menu() {
   $items['profile'] = array(
@@ -81,6 +81,7 @@ function profile_menu() {
     'page callback' => 'profile_browse',
     'access arguments' => array('access user profiles'),
     'type' => MENU_SUGGESTED_ITEM,
+    'file' => 'profile.pages.inc',
   );
   $items['admin/user/profile'] = array(
     'title' => 'Profiles',
@@ -88,6 +89,7 @@ function profile_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('profile_admin_overview'),
     'access arguments' => array('administer users'),
+    'file' => 'profile.admin.inc',
   );
   $items['admin/user/profile/add'] = array(
     'title' => 'Add field',
@@ -95,12 +97,14 @@ function profile_menu() {
     'page arguments' => array('profile_field_form'),
     'access arguments' => array('administer users'),
     'type' => MENU_CALLBACK,
+    'file' => 'profile.admin.inc',
   );
   $items['admin/user/profile/autocomplete'] = array(
     'title' => 'Profile category autocomplete',
     'page callback' => 'profile_admin_settings_autocomplete',
     'access arguments' => array('administer users'),
     'type' => MENU_CALLBACK,
+    'file' => 'profile.admin.inc',
   );
   $items['admin/user/profile/edit'] = array(
     'title' => 'Edit field',
@@ -108,6 +112,7 @@ function profile_menu() {
     'page arguments' => array('profile_field_form'),
     'access arguments' => array('administer users'),
     'type' => MENU_CALLBACK,
+    'file' => 'profile.admin.inc',
   );
   $items['admin/user/profile/delete'] = array(
     'title' => 'Delete field',
@@ -115,174 +120,128 @@ function profile_menu() {
     'page arguments' => array('profile_field_delete'),
     'access arguments' => array('administer users'),
     'type' => MENU_CALLBACK,
+    'file' => 'profile.admin.inc',
   );
   $items['profile/autocomplete'] = array(
     'title' => 'Profile autocomplete',
     'page callback' => 'profile_autocomplete',
     'access arguments' => array('access user profiles'),
     'type' => MENU_CALLBACK,
+    'file' => 'profile.pages.inc',
   );
   return $items;
 }
 
 /**
- * Implement hook_block_list().
+ * Implementation of hook_block().
  */
-function profile_block_list() {
-  $blocks['author-information']['info'] = t('Author information');
-  $blocks['author-information']['cache'] = BLOCK_CACHE_PER_PAGE | BLOCK_CACHE_PER_ROLE;
-  return $blocks;
-}
+function profile_block($op = 'list', $delta = 0, $edit = array()) {
 
-/**
- * Implement hook_block_configure().
- */
-function profile_block_configure($delta = '') {
-  // Compile a list of fields to show
-  $fields = array();
-  $result = db_query('SELECT name, title, weight, visibility FROM {profile_field} WHERE visibility IN (:visibility) ORDER BY weight', array(':visibility' => array(PROFILE_PUBLIC, PROFILE_PUBLIC_LISTINGS)));
-  foreach ($result as $record) {
-    $fields[$record->name] = check_plain($record->title);
+  if ($op == 'list') {
+    $blocks[0]['info'] = t('Author information');
+    $blocks[0]['cache'] = BLOCK_CACHE_PER_PAGE | BLOCK_CACHE_PER_ROLE;
+    return $blocks;
   }
-  $fields['user_profile'] = t('Link to full user profile');
-  $form['profile_block_author_fields'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Profile fields to display'),
-    '#default_value' => variable_get('profile_block_author_fields', array()),
-    '#options' => $fields,
-    '#description' => t('Select which profile fields you wish to display in the block. Only fields designated as public in the <a href="@profile-admin">profile field configuration</a> are available.', array('@profile-admin' => url('admin/user/profile'))),
-  );
-  return $form;
-}
+  else if ($op == 'configure' && $delta == 0) {
+    // Compile a list of fields to show
+    $fields = array();
+    $result = db_query('SELECT name, title, weight, visibility FROM {profile_fields} WHERE visibility IN (%d, %d) ORDER BY weight', PROFILE_PUBLIC, PROFILE_PUBLIC_LISTINGS);
+    while ($record = db_fetch_object($result)) {
+      $fields[$record->name] = check_plain($record->title);
+    }
+    $fields['user_profile'] = t('Link to full user profile');
+    $form['profile_block_author_fields'] = array('#type' => 'checkboxes',
+      '#title' => t('Profile fields to display'),
+      '#default_value' => variable_get('profile_block_author_fields', array()),
+      '#options' => $fields,
+      '#description' => t('Select which profile fields you wish to display in the block. Only fields designated as public in the <a href="@profile-admin">profile field configuration</a> are available.', array('@profile-admin' => url('admin/user/profile'))),
+    );
+    return $form;
+  }
+  else if ($op == 'save' && $delta == 0) {
+    variable_set('profile_block_author_fields', $edit['profile_block_author_fields']);
+  }
+  else if ($op == 'view') {
+    if (user_access('access user profiles')) {
+      $output = '';
+      if ((arg(0) == 'node') && is_numeric(arg(1)) && (arg(2) == NULL)) {
+        $node = node_load(arg(1));
+        $account = user_load(array('uid' => $node->uid));
 
-/**
- * Implement hook_block_save().
- */
-function profile_block_save($delta = '', $edit = array()) {
-  variable_set('profile_block_author_fields', $edit['profile_block_author_fields']);
-}
-
-/**
- * Implement hook_block_view().
- */
-function profile_block_view($delta = '') {
-  if (user_access('access user profiles')) {
-    $output = '';
-    if ((arg(0) == 'node') && is_numeric(arg(1)) && (arg(2) == NULL)) {
-      $node = node_load(arg(1));
-      $account = user_load(array('uid' => $node->uid));
-
-      if ($use_fields = variable_get('profile_block_author_fields', array())) {
-        // Compile a list of fields to show.
-        $fields = array();
-        $result = db_query('SELECT name, title, weight, visibility FROM {profile_field} WHERE visibility IN (:visibility) ORDER BY weight', array(':visibility' => array(PROFILE_PUBLIC, PROFILE_PUBLIC_LISTINGS)));
-        foreach ($result as $record) {
-          // Ensure that field is displayed only if it is among the defined block fields and, if it is private, the user has appropriate permissions.
-          if (isset($use_fields[$record->name]) && $use_fields[$record->name]) {
-            $fields[] = $record;
+        if ($use_fields = variable_get('profile_block_author_fields', array())) {
+          // Compile a list of fields to show.
+          $fields = array();
+          $result = db_query('SELECT name, title, type, visibility, weight FROM {profile_fields} WHERE visibility IN (%d, %d) ORDER BY weight', PROFILE_PUBLIC, PROFILE_PUBLIC_LISTINGS);
+          while ($record = db_fetch_object($result)) {
+            // Ensure that field is displayed only if it is among the defined block fields and, if it is private, the user has appropriate permissions.
+            if (isset($use_fields[$record->name]) && $use_fields[$record->name]) {
+              $fields[] = $record;
+            }
           }
+        }
+
+        if (!empty($fields)) {
+          $profile = _profile_update_user_fields($fields, $account);
+          $output .= theme('profile_block', $account, $profile, TRUE);
+        }
+
+        if (isset($use_fields['user_profile']) && $use_fields['user_profile']) {
+          $output .= '<div>'. l(t('View full user profile'), 'user/'. $account->uid) .'</div>';
         }
       }
 
-      if (!empty($fields)) {
-        $profile = _profile_update_user_fields($fields, $account);
-        $output .= theme('profile_block', $account, $profile, TRUE);
+      if ($output) {
+        $block['subject'] = t('About %name', array('%name' => $account->name));
+        $block['content'] = $output;
+        return $block;
       }
-
-      if (isset($use_fields['user_profile']) && $use_fields['user_profile']) {
-        $output .= '<div>' . l(t('View full user profile'), 'user/' . $account->uid) . '</div>';
-      }
-    }
-
-    if ($output) {
-      $block['subject'] = t('About %name', array('%name' => $account->name));
-      $block['content'] = $output;
-      return $block;
     }
   }
 }
 
 /**
- * Implement hook_user_register().
+ * Implementation of hook_user().
  */
-function profile_user_register(&$edit, &$user, $category = NULL) {
-  return profile_form_profile($edit, $user, $category, TRUE);
-}
-
-/**
- * Implement hook_user_update().
- */
-function profile_user_update(&$edit, &$user, $category = NULL) {
-  return profile_save_profile($edit, $user, $category);
-}
-
-/**
- * Implement hook_user_insert().
- */
-function profile_user_insert(&$edit, &$user, $category = NULL) {
-  return profile_save_profile($edit, $user, $category, TRUE);
-}
-
-/**
- * Implement hook_user_view().
- */
-function profile_user_view(&$edit, &$user, $category = NULL) {
-  return profile_view_profile($user);
-}
-
-/**
- * Implement hook_user_form().
- */
-function profile_user_form(&$edit, &$user, $category = NULL) {
-  return profile_form_profile($edit, $user, $category);
-}
-
-/**
- * Implement hook_user_validate().
- */
-function profile_user_validate(&$edit, &$user, $category = NULL) {
-  return profile_validate_profile($edit, $category);
-}
-
-/**
- * Implement hook_user_cancel().
- */
-function profile_user_cancel(&$edit, &$account, $method) {
-  switch ($method) {
-    case 'user_cancel_reassign':
-    case 'user_cancel_delete':
-      db_delete('profile_value')
-        ->condition('uid', $account->uid)
-        ->execute();
-      break;
+function profile_user($type, &$edit, &$user, $category = NULL) {
+  switch ($type) {
+    case 'load':
+      return profile_load_profile($user);
+    case 'register':
+      return profile_form_profile($edit, $user, $category, TRUE);
+    case 'update':
+    return profile_save_profile($edit, $user, $category);
+    case 'insert':
+      return profile_save_profile($edit, $user, $category, TRUE);
+    case 'view':
+      return profile_view_profile($user);
+    case 'form':
+      return profile_form_profile($edit, $user, $category);
+    case 'validate':
+      return profile_validate_profile($edit, $category);
+    case 'categories':
+      return profile_categories();
+    case 'delete':
+      db_query('DELETE FROM {profile_values} WHERE uid = %d', $user->uid);
   }
 }
 
-/**
- * Implement hook_user_load().
- */
-function profile_user_load($users) {
-  $result = db_query('SELECT f.name, f.type, v.uid, v.value FROM {profile_field} f INNER JOIN {profile_value} v ON f.fid = v.fid WHERE uid IN (:uids)', array(':uids' => array_keys($users)));
-  foreach ($result as $record) {
-    if (empty($users[$record->uid]->{$record->name})) {
-      $users[$record->uid]->{$record->name} = _profile_field_serialize($record->type) ? unserialize($record->value) : $record->value;
+function profile_load_profile(&$user) {
+  $result = db_query('SELECT f.name, f.type, v.value FROM {profile_fields} f INNER JOIN {profile_values} v ON f.fid = v.fid WHERE uid = %d', $user->uid);
+  while ($field = db_fetch_object($result)) {
+    if (empty($user->{$field->name})) {
+      $user->{$field->name} = _profile_field_serialize($field->type) ? unserialize($field->value) : $field->value;
     }
   }
 }
 
 function profile_save_profile(&$edit, &$user, $category, $register = FALSE) {
   $result = _profile_get_fields($category, $register);
-  foreach ($result as $field) {
+  while ($field = db_fetch_object($result)) {
     if (_profile_field_serialize($field->type)) {
       $edit[$field->name] = serialize($edit[$field->name]);
     }
-    db_merge('profile_value')
-      ->key(array(
-        'fid' => $field->fid,
-        'uid' => $user->uid,
-      ))
-      ->fields(array('value' => $edit[$field->name]))
-      ->execute();
+    db_query("DELETE FROM {profile_values} WHERE fid = %d AND uid = %d", $field->fid, $user->uid);
+    db_query("INSERT INTO {profile_values} (fid, uid, value) VALUES (%d, %d, '%s')", $field->fid, $user->uid, $edit[$field->name]);
     // Mark field as handled (prevents saving to user->data).
     $edit[$field->name] = NULL;
   }
@@ -293,8 +252,8 @@ function profile_view_field($user, $field) {
   // and if a user has permission to view profiles. Note that this check is
   // necessary because a user may always see their own profile.
   $browse = user_access('access user profiles')
-        && (user_access('administer users') || $field->visibility != PROFILE_PRIVATE)
-        && !empty($field->page);
+         && (user_access('administer users') || $field->visibility != PROFILE_PRIVATE)
+         && !empty($field->page);
 
   if (isset($user->{$field->name}) && $value = $user->{$field->name}) {
     switch ($field->type) {
@@ -302,11 +261,11 @@ function profile_view_field($user, $field) {
         return check_markup($value);
       case 'textfield':
       case 'selection':
-        return $browse ? l($value, 'profile/' . $field->name . '/' . $value) : check_plain($value);
+        return $browse ? l($value, 'profile/'. $field->name .'/'. $value) : check_plain($value);
       case 'checkbox':
-        return $browse ? l($field->title, 'profile/' . $field->name) : check_plain($field->title);
+        return $browse ? l($field->title, 'profile/'. $field->name) : check_plain($field->title);
       case 'url':
-        return '<a href="' . check_url($value) . '">' . check_plain($value) . '</a>';
+        return '<a href="'. check_url($value) .'">'. check_plain($value) .'</a>';
       case 'date':
         $format = substr(variable_get('date_format_short', 'm/d/Y - H:i'), 0, 5);
         // Note: Avoid PHP's date() because it does not handle dates before
@@ -323,11 +282,11 @@ function profile_view_field($user, $field) {
         );
         return strtr($format, $replace);
       case 'list':
-        $values = preg_split("/[,\n\r]/", $value);
+        $values = split("[,\n\r]", $value);
         $fields = array();
         foreach ($values as $value) {
           if ($value = trim($value)) {
-            $fields[] = $browse ? l($value, 'profile/' . $field->name . '/' . $value) : check_plain($value);
+            $fields[] = $browse ? l($value, 'profile/'. $field->name .'/'. $value) : check_plain($value);
           }
         }
         return implode(', ', $fields);
@@ -337,18 +296,18 @@ function profile_view_field($user, $field) {
 
 function profile_view_profile(&$user) {
 
-  $user = user_load($user->uid);
+  profile_load_profile($user);
 
   // Show private fields to administrators and people viewing their own account.
   if (user_access('administer users') || $GLOBALS['user']->uid == $user->uid) {
-    $result = db_query('SELECT * FROM {profile_field} WHERE visibility <> %d ORDER BY category, weight', PROFILE_HIDDEN);
+    $result = db_query('SELECT * FROM {profile_fields} WHERE visibility != %d ORDER BY category, weight', PROFILE_HIDDEN);
   }
   else {
-    $result = db_query('SELECT * FROM {profile_field} WHERE visibility <> :private AND visibility <> :hidden ORDER BY category, weight', array(':private' => PROFILE_PRIVATE, ':hidden' => PROFILE_HIDDEN));
+    $result = db_query('SELECT * FROM {profile_fields} WHERE visibility != %d AND visibility != %d ORDER BY category, weight', PROFILE_PRIVATE, PROFILE_HIDDEN);
   }
 
   $fields = array();
-  foreach ($result as $field) {
+  while ($field = db_fetch_object($result)) {
     if ($value = profile_view_field($user, $field)) {
       $title = ($field->type != 'checkbox') ? check_plain($field->title) : NULL;
 
@@ -363,9 +322,9 @@ function profile_view_profile(&$user) {
       $user->content[$field->category][$field->name] = array(
         '#type' => 'user_profile_item',
         '#title' => $title,
-        '#markup' => $value,
+        '#value' => $value,
         '#weight' => $field->weight,
-        '#attributes' => array('class' => 'profile-' . $field->name),
+        '#attributes' => array('class' => 'profile-'. $field->name),
       );
     }
   }
@@ -375,11 +334,11 @@ function _profile_form_explanation($field) {
   $output = $field->explanation;
 
   if ($field->type == 'list') {
-    $output .= ' ' . t('Put each item on a separate line or separate them by commas. No HTML allowed.');
+    $output .= ' '. t('Put each item on a separate line or separate them by commas. No HTML allowed.');
   }
 
   if ($field->visibility == PROFILE_PRIVATE) {
-    $output .= ' ' . t('The content of this field is kept private and will not be shown publicly.');
+    $output .= ' '. t('The content of this field is kept private and will not be shown publicly.');
   }
 
   return $output;
@@ -389,7 +348,7 @@ function profile_form_profile($edit, $user, $category, $register = FALSE) {
   $result = _profile_get_fields($category, $register);
   $weight = 1;
   $fields = array();
-  foreach ($result as $field) {
+  while ($field = db_fetch_object($result)) {
     $category = $field->category;
     if (!isset($fields[$category])) {
       $fields[$category] = array('#type' => 'fieldset', '#title' => check_plain($category), '#weight' => $weight++);
@@ -405,7 +364,7 @@ function profile_form_profile($edit, $user, $category, $register = FALSE) {
           '#required' => $field->required,
         );
         if ($field->autocomplete) {
-          $fields[$category][$field->name]['#autocomplete_path'] = "profile/autocomplete/" . $field->fid;
+          $fields[$category][$field->name]['#autocomplete_path'] = "profile/autocomplete/". $field->fid;
         }
         break;
       case 'textarea':
@@ -434,7 +393,7 @@ function profile_form_profile($edit, $user, $category, $register = FALSE) {
         break;
       case 'selection':
         $options = $field->required ? array() : array('--');
-        $lines = preg_split("/[\n\r]/", $field->options);
+        $lines = split("[\n\r]", $field->options);
         foreach ($lines as $line) {
           if ($line = trim($line)) {
             $options[$line] = $line;
@@ -473,7 +432,7 @@ function _profile_update_user_fields($fields, $account) {
 
 function profile_validate_profile($edit, $category) {
   $result = _profile_get_fields($category);
-  foreach ($result as $field) {
+  while ($field = db_fetch_object($result)) {
     if ($edit[$field->name]) {
       if ($field->type == 'url') {
         if (!valid_url($edit[$field->name], TRUE)) {
@@ -481,20 +440,18 @@ function profile_validate_profile($edit, $category) {
         }
       }
     }
-    elseif ($field->required && !user_access('administer users')) {
+    else if ($field->required && !user_access('administer users')) {
       form_set_error($field->name, t('The field %field is required.', array('%field' => $field->title)));
     }
   }
 
   return $edit;
 }
-/**
- * Implement hook_user_categories().
- */
-function profile_user_categories() {
-  $result = db_query("SELECT DISTINCT(category) FROM {profile_field}");
+
+function profile_categories() {
+  $result = db_query("SELECT DISTINCT(category) FROM {profile_fields}");
   $data = array();
-  foreach ($result as $category) {
+  while ($category = db_fetch_object($result)) {
     $data[] = array(
       'name' => $category->category,
       'title' => $category->category,
@@ -514,11 +471,7 @@ function profile_category_access($account, $category) {
     return TRUE;
   }
   else {
-    $category_visible = (bool) db_query_range('SELECT 1 FROM {profile_field} WHERE category = :category AND visibility <> :visibility', array(
-      ':category' => $category,
-      ':visibility' => PROFILE_HIDDEN
-    ), 0, 1)->fetchField();
-    return user_edit_access($account) && $category_visible;
+    return user_edit_access($account) && db_result(db_query("SELECT COUNT(*) FROM {profile_fields} WHERE category = '%s' AND visibility <> %d", $category, PROFILE_HIDDEN));
   }
 }
 
@@ -584,7 +537,7 @@ function template_preprocess_profile_wrapper(&$variables) {
   if ($field = arg(1)) {
     $variables['current_field'] = $field;
     // Supply an alternate template suggestion based on the browsable field.
-    $variables['template_files'][] = 'profile-wrapper-' . $field;
+    $variables['template_files'][] = 'profile-wrapper-'. $field;
   }
 }
 
@@ -604,21 +557,23 @@ function _profile_field_serialize($type = NULL) {
 }
 
 function _profile_get_fields($category, $register = FALSE) {
-  $query = db_select('profile_field');
+  $args = array();
+  $sql = 'SELECT * FROM {profile_fields} WHERE ';
+  $filters = array();
   if ($register) {
-    $query->condition('register', 1);
+    $filters[] = 'register = 1';
   }
   else {
-    // Use LOWER(:category) instead of PHP's strtolower() to avoid UTF-8 conversion issues.
-    $query->where('LOWER(category) = LOWER(:category)', array(':category' => $category));
+    // Use LOWER('%s') instead of PHP's strtolower() to avoid UTF-8 conversion issues.
+    $filters[] = "LOWER(category) = LOWER('%s')";
+    $args[] = $category;
   }
   if (!user_access('administer users')) {
-    $query->condition('visibility', PROFILE_HIDDEN, '<>');
+    $filters[] = 'visibility != %d';
+    $args[] = PROFILE_HIDDEN;
   }
-  return $query
-    ->fields('profile_field')
-    ->orderBy('category', 'ASC')
-    ->orderBy('weight', 'ASC')
-    ->execute();
+  $sql .= implode(' AND ', $filters);
+  $sql .= ' ORDER BY category, weight';
+  return db_query($sql, $args);
 }
 

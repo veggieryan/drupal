@@ -1,53 +1,26 @@
 <?php
-// $Id: openid.inc,v 1.18 2009/06/03 19:27:21 dries Exp $
+// $Id: openid.inc,v 1.8 2008/01/30 22:11:22 goba Exp $
 
 /**
  * @file
  * OpenID utility functions.
  */
 
-/**
- * Diffie-Hellman Key Exchange Default Value.
- *
- * This is used to establish an association between the Relying Party and the
- * OpenID Provider.
- *
- * See RFC 2631: http://www.ietf.org/rfc/rfc2631.txt
- */
-define('OPENID_DH_DEFAULT_MOD', '155172898181473697471232257763715539915724801' .
-       '966915404479707795314057629378541917580651227423698188993727816152646631' .
-       '438561595825688188889951272158842675419950341258706556549803580104870537' .
-       '681476726513255747040765857479291291572334510643245094715007229621094194' .
+// Diffie-Hellman Key Exchange Default Value.
+define('OPENID_DH_DEFAULT_MOD', '155172898181473697471232257763715539915724801'.
+       '966915404479707795314057629378541917580651227423698188993727816152646631'.
+       '438561595825688188889951272158842675419950341258706556549803580104870537'.
+       '681476726513255747040765857479291291572334510643245094715007229621094194'.
        '349783925984760375594985848253359305585439638443');
 
-/**
- * Diffie-Hellman generator; used for Diffie-Hellman key exchange computations.
- */
+// Constants for Diffie-Hellman key exchange computations.
 define('OPENID_DH_DEFAULT_GEN', '2');
-
-/**
- * SHA-1 hash block size; used for Diffie-Hellman key exchange computations.
- */
 define('OPENID_SHA1_BLOCKSIZE', 64);
-
-/**
- * Random number generator; used for Diffie-Hellman key exchange computations.
- */
 define('OPENID_RAND_SOURCE', '/dev/urandom');
 
-/**
- * OpenID Authentication 2.0 namespace URL.
- */
+// OpenID namespace URLs
 define('OPENID_NS_2_0', 'http://specs.openid.net/auth/2.0');
-
-/**
- * OpenID Authentication 1.1 namespace URL; used for backwards-compatibility.
- */
 define('OPENID_NS_1_1', 'http://openid.net/signon/1.1');
-
-/**
- * OpenID Authentication 1.0 namespace URL; used for backwards-compatibility.
- */
 define('OPENID_NS_1_0', 'http://openid.net/signon/1.0');
 
 /**
@@ -56,15 +29,11 @@ define('OPENID_NS_1_0', 'http://openid.net/signon/1.0');
 function openid_redirect_http($url, $message) {
   $query = array();
   foreach ($message as $key => $val) {
-    $query[] = $key . '=' . urlencode($val);
+    $query[] = $key .'='. urlencode($val);
   }
 
   $sep = (strpos($url, '?') === FALSE) ? '?' : '&';
-  header('Location: ' . $url . $sep . implode('&', $query), TRUE, 302);
-
-  // Commit session data before redirecting.
-  drupal_session_commit();
-
+  header('Location: '. $url . $sep . implode('&', $query), TRUE, 302);
   exit;
 }
 
@@ -72,15 +41,11 @@ function openid_redirect_http($url, $message) {
  * Creates a js auto-submit redirect for (for the 2.x protocol)
  */
 function openid_redirect($url, $message) {
-  $output = '<html><head><title>' . t('OpenID redirect') . "</title></head>\n<body>";
-  $output .= drupal_render(drupal_get_form('openid_redirect_form', $url, $message));
+  $output = '<html><head><title>'. t('OpenID redirect') ."</title></head>\n<body>";
+  $output .= drupal_get_form('openid_redirect_form', $url, $message);
   $output .= '<script type="text/javascript">document.getElementById("openid-redirect-form").submit();</script>';
   $output .= "</body></html>\n";
   print $output;
-
-  // Commit session data before redirecting.
-  drupal_session_commit();
-
   exit;
 }
 
@@ -144,7 +109,7 @@ function _openid_normalize_url($url) {
   $normalized_url = $url;
 
   if (stristr($url, '://') === FALSE) {
-    $normalized_url = 'http://' . $url;
+    $normalized_url = 'http://'. $url;
   }
 
   if (substr_count($normalized_url, '/') < 3) {
@@ -162,7 +127,7 @@ function _openid_create_message($data) {
 
   foreach ($data as $key => $value) {
     if ((strpos($key, ':') !== FALSE) || (strpos($key, "\n") !== FALSE) || (strpos($value, "\n") !== FALSE)) {
-      return NULL;
+      return null;
     }
     $serialized .= "$key:$value\n";
   }
@@ -183,7 +148,7 @@ function _openid_encode_message($message) {
       if ($encoded_message != '') {
         $encoded_message .= '&';
       }
-      $encoded_message .= rawurlencode(trim($parts[0])) . '=' . rawurlencode(trim($parts[1]));
+      $encoded_message .= rawurlencode(trim($parts[0])) .'='. rawurlencode(trim($parts[1]));
     }
   }
 
@@ -226,7 +191,7 @@ function _openid_nonce() {
  */
 function _openid_link_href($rel, $html) {
   $rel = preg_quote($rel);
-  preg_match('|<link\s+rel=["\'](.*)' . $rel . '(.*)["\'](.*)/?>|iUs', $html, $matches);
+  preg_match('|<link\s+rel=["\'](.*)'. $rel .'(.*)["\'](.*)/?>|iUs', $html, $matches);
   if (isset($matches[3])) {
     preg_match('|href=["\']([^"]+)["\']|iU', $matches[3], $href);
     return trim($href[1]);
@@ -238,7 +203,7 @@ function _openid_link_href($rel, $html) {
  * Pull the http-equiv attribute out of an html meta element
  */
 function _openid_meta_httpequiv($equiv, $html) {
-  preg_match('|<meta\s+http-equiv=["\']' . $equiv . '["\'](.*)/?>|iUs', $html, $matches);
+  preg_match('|<meta\s+http-equiv=["\']'. $equiv .'["\'](.*)/?>|iUs', $html, $matches);
   if (isset($matches[1])) {
     preg_match('|content=["\']([^"]+)["\']|iUs', $matches[1], $content);
     if (isset($content[1])) {
@@ -261,8 +226,8 @@ function _openid_signature($association, $message_array, $keys_to_sign) {
   $sign_data = array();
 
   foreach ($keys_to_sign as $key) {
-    if (isset($message_array['openid.' . $key])) {
-      $sign_data[$key] = $message_array['openid.' . $key];
+    if (isset($message_array['openid.'. $key])) {
+      $sign_data[$key] = $message_array['openid.'. $key];
     }
   }
 
@@ -275,16 +240,27 @@ function _openid_signature($association, $message_array, $keys_to_sign) {
 
 function _openid_hmac($key, $text) {
   if (strlen($key) > OPENID_SHA1_BLOCKSIZE) {
-    $key = sha1($key, TRUE);
+    $key = _openid_sha1($key, true);
   }
 
   $key = str_pad($key, OPENID_SHA1_BLOCKSIZE, chr(0x00));
   $ipad = str_repeat(chr(0x36), OPENID_SHA1_BLOCKSIZE);
   $opad = str_repeat(chr(0x5c), OPENID_SHA1_BLOCKSIZE);
-  $hash1 = sha1(($key ^ $ipad) . $text, TRUE);
-  $hmac = sha1(($key ^ $opad) . $hash1, TRUE);
+  $hash1 = _openid_sha1(($key ^ $ipad) . $text, true);
+  $hmac = _openid_sha1(($key ^ $opad) . $hash1, true);
 
   return $hmac;
+}
+
+function _openid_sha1($text) {
+  $hex = sha1($text);
+  $raw = '';
+  for ($i = 0; $i < 40; $i += 2) {
+    $hexcode = substr($hex, $i, 2);
+    $charcode = (int)base_convert($hexcode, 16, 10);
+    $raw .= chr($charcode);
+  }
+  return $raw;
 }
 
 function _openid_dh_base64_to_long($str) {
@@ -340,7 +316,7 @@ function _openid_dh_long_to_binary($long) {
 
 function _openid_dh_xorsecret($shared, $secret) {
   $dh_shared_str = _openid_dh_long_to_binary($shared);
-  $sha1_dh_shared = sha1($dh_shared_str, TRUE);
+  $sha1_dh_shared = _openid_sha1($dh_shared_str);
   $xsecret = "";
   for ($i = 0; $i < strlen($secret); $i++) {
     $xsecret .= chr(ord($secret[$i]) ^ ord($sha1_dh_shared[$i]));
@@ -350,7 +326,7 @@ function _openid_dh_xorsecret($shared, $secret) {
 }
 
 function _openid_dh_rand($stop) {
-  $duplicate_cache = &drupal_static(__FUNCTION__, array());
+  static $duplicate_cache = array();
 
   // Used as the key for the duplicate cache
   $rbytes = _openid_dh_long_to_binary($stop);
@@ -380,7 +356,7 @@ function _openid_dh_rand($stop) {
   }
 
   do {
-    $bytes = "\x00" . _openid_get_bytes($nbytes);
+    $bytes = "\x00". _openid_get_bytes($nbytes);
     $n = _openid_dh_binary_to_long($bytes);
     // Keep looping if this value is in the low duplicated range.
   } while (bccomp($n, $duplicate) < 0);
@@ -389,7 +365,7 @@ function _openid_dh_rand($stop) {
 }
 
 function _openid_get_bytes($num_bytes) {
-  $f = &drupal_static(__FUNCTION__);
+  static $f = null;
   $bytes = '';
   if (!isset($f)) {
     $f = @fopen(OPENID_RAND_SOURCE, "r");
@@ -410,7 +386,7 @@ function _openid_get_bytes($num_bytes) {
 
 function _openid_response($str = NULL) {
   $data = array();
-
+  
   if (isset($_SERVER['REQUEST_METHOD'])) {
     $data = _openid_get_params($_SERVER['QUERY_STRING']);
 
@@ -418,7 +394,7 @@ function _openid_response($str = NULL) {
       $str = file_get_contents('php://input');
 
       $post = array();
-      if ($str !== FALSE) {
+      if ($str !== false) {
         $post = _openid_get_params($str);
       }
 
@@ -442,4 +418,22 @@ function _openid_get_params($str) {
     }
   }
   return $data;
+}
+
+/**
+ * Provide bcpowmod support for PHP4.
+ */
+if (!function_exists('bcpowmod')) {
+  function bcpowmod($base, $exp, $mod) {
+    $square = bcmod($base, $mod);
+    $result = 1;
+    while (bccomp($exp, 0) > 0) {
+      if (bcmod($exp, 2)) {
+        $result = bcmod(bcmul($result, $square), $mod);
+      }
+      $square = bcmod(bcmul($square, $square), $mod);
+      $exp = bcdiv($exp, 2);
+    }
+    return $result;
+  }
 }
