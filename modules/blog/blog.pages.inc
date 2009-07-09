@@ -1,0 +1,150 @@
+<?php
+// $Id: blog.pages.inc,v 1.20 2009/07/02 04:27:22 webchick Exp $
+
+/**
+ * @file
+ * Page callback file for the blog module.
+ */
+
+/**
+ * Menu callback; displays a Drupal page containing recent blog entries of a given user.
+ */
+function blog_page_user($account) {
+  global $user;
+
+  drupal_set_title($title = t("@name's blog", array('@name' => $account->name)), PASS_THROUGH);
+
+  $items = array();
+
+  if (($account->uid == $user->uid) && user_access('create blog content')) {
+    $items[] = l(t('Post new blog entry.'), "node/add/blog");
+  }
+  elseif ($account->uid == $user->uid) {
+    $items[] = t('You are not allowed to post a new blog entry.');
+  }
+
+  $build['blog_actions'] = array(
+    '#items' => $items,
+    '#theme' => 'item_list',
+    '#weight' => -1,
+  );
+
+  $query = db_select('node', 'n')->extend('PagerDefault');
+  $nids = $query
+    ->fields('n', array('nid', 'sticky', 'created'))
+    ->condition('type', 'blog')
+    ->condition('uid', $account->uid)
+    ->condition('status', 1)
+    ->orderBy('sticky', 'DESC')
+    ->orderBy('created', 'DESC')
+    ->limit(variable_get('default_nodes_main', 10))
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  if (!empty($nids)) {
+    $nodes = node_load_multiple($nids);
+    $build += node_build_multiple($nodes);
+    $build['pager'] = array(
+      '#markup' => theme('pager', NULL),
+      '#weight' => 5,
+    );
+  }
+  else {
+    if ($account->uid == $user->uid) {
+      drupal_set_message(t('You have not created any blog entries.'));
+    }
+    else {
+      drupal_set_message(t('!author has not created any blog entries.', array('!author' => theme('username', $account))));
+    }
+  }
+  drupal_add_feed(url('blog/' . $account->uid . '/feed'), t('RSS - !title', array('!title' => $title)));
+
+  return $build;
+}
+
+/**
+ * Menu callback; displays a Drupal page containing recent blog entries of all users.
+ */
+function blog_page_last() {
+  global $user;
+  $build = array();
+
+  if (user_access('create blog content')) {
+    $items[] = l(t('Create new blog entry.'), "node/add/blog");
+    $build['blog_actions'] = array(
+      '#items' => $items,
+      '#theme' => 'item_list',
+      '#weight' => -1,
+    );
+  }
+
+  $query = db_select('node', 'n')->extend('PagerDefault');
+  $nids = $query
+    ->fields('n', array('nid', 'sticky', 'created'))
+    ->condition('type', 'blog')
+    ->condition('status', 1)
+    ->orderBy('sticky', 'DESC')
+    ->orderBy('created', 'DESC')
+    ->limit(variable_get('default_nodes_main', 10))
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  if (!empty($nids)) {
+    $nodes = node_load_multiple($nids);
+    $build += node_build_multiple($nodes);
+    $build['pager'] = array(
+      '#markup' => theme('pager', NULL),
+      '#weight' => 5,
+    );
+  }
+  else {
+    drupal_set_message(t('No blog entries have been created.'));
+  }
+  drupal_add_feed(url('blog/feed'), t('RSS - blogs'));
+
+  return $build;
+}
+
+/**
+ * Menu callback; displays an RSS feed containing recent blog entries of a given user.
+ */
+function blog_feed_user($account) {
+
+  $nids = db_select('node', 'n')
+    ->fields('n', array('nid', 'created'))
+    ->condition('type', 'blog')
+    ->condition('uid', $account->uid)
+    ->condition('status', 1)
+    ->orderBy('created', 'DESC')
+    ->range(0, variable_get('feed_default_items', 10))
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  $channel['title'] = $account->name . "'s blog";
+  $channel['link'] = url('blog/' . $account->uid, array('absolute' => TRUE));
+
+  node_feed($nids, $channel);
+}
+
+/**
+ * Menu callback; displays an RSS feed containing recent blog entries of all users.
+ */
+function blog_feed_last() {
+  $nids = db_select('node', 'n')
+    ->fields('n', array('nid', 'created'))
+    ->condition('type', 'blog')
+    ->condition('status', 1)
+    ->orderBy('created', 'DESC')
+    ->range(0, variable_get('feed_default_items', 10))
+    ->addTag('node_access')
+    ->execute()
+    ->fetchCol();
+
+  $channel['title'] = variable_get('site_name', 'Drupal') . ' blogs';
+  $channel['link'] = url('blog', array('absolute' => TRUE));
+
+  node_feed($nids, $channel);
+}

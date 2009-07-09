@@ -1,0 +1,204 @@
+<?php
+// $Id: blog.module,v 1.327 2009/07/05 18:00:07 dries Exp $
+
+/**
+ * @file
+ * Enables multi-user blogs.
+ */
+
+/**
+ * Implement hook_node_info().
+ */
+function blog_node_info() {
+  return array(
+    'blog' => array(
+      'name' => t('Blog entry'),
+      'base' => 'blog',
+      'description' => t('Use for multi-user blogs. Every user gets a personal blog.'),
+    )
+  );
+}
+
+/**
+ * Implement hook_permission().
+ */
+function blog_permission() {
+  return node_list_permissions('blog');
+}
+
+/**
+ * Implement hook_access().
+ */
+function blog_access($op, $node, $account) {
+  switch ($op) {
+    case 'create':
+      // Anonymous users cannot post even if they have the permission.
+      return user_access('create blog content', $account) && $account->uid;
+    case 'update':
+      return user_access('edit any blog content', $account) || (user_access('edit own blog content', $account) && ($node->uid == $account->uid));
+    case 'delete':
+      return user_access('delete any blog content', $account) || (user_access('delete own blog content', $account) && ($node->uid == $account->uid));
+  }
+}
+
+/**
+ * Implement hook_user_view().
+ */
+function blog_user_view(&$edit, &$user, $category) {
+  if (user_access('create blog content', $user)) {
+    $user->content['summary']['blog'] =  array(
+      '#type' => 'user_profile_item',
+      '#title' => t('Blog'),
+      '#markup' => l(t('View recent blog entries'), "blog/$user->uid", array('attributes' => array('title' => t("Read !username's latest blog entries.", array('!username' => $user->name))))),
+      '#attributes' => array('class' => 'blog'),
+    );
+  }
+}
+
+/**
+ * Implement hook_help().
+ */
+function blog_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#blog':
+      $output  = '<p>' . t('The blog module allows registered users to maintain an online journal, or <em>blog</em>. Blogs are made up of individual <em>blog entries</em>, and the blog entries are most often displayed in descending order by creation time.') . '</p>';
+      $output .= '<p>' . t("There is an (optional) <em>Blogs</em> menu item added to the Navigation menu, which displays all blogs available on your site, and a <em>My blog</em> item displaying the current user's blog entries. The <em>Blog entry</em> menu item under <em>Add new content</em> allows new blog entries to be created.") . '</p>';
+      $output .= '<p>' . t('Each blog entry is displayed with an automatic link to other blogs created by the same user. By default, blog entries have comments enabled and are automatically promoted to the site front page. The blog module also creates a <em>Recent blog posts</em> block that may be enabled at the <a href="@blocks">blocks administration page</a>.', array('@blocks' => url('admin/build/block'))) . '</p>';
+      $output .= '<p>' . t('For more information, see the online handbook entry for <a href="@blog">Blog module</a>.', array('@blog' => 'http://drupal.org/handbook/modules/blog/')) . '</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implement hook_form().
+ */
+function blog_form($node, $form_state) {
+  return node_content_form($node, $form_state);
+}
+
+/**
+ * Implement hook_view().
+ */
+function blog_view($node, $build_mode) {
+  if ((bool)menu_get_object()) {
+    // Breadcrumb navigation.
+    drupal_set_breadcrumb(array(l(t('Home'), NULL), l(t('Blogs'), 'blog'), l(t("!name's blog", array('!name' => $node->name)), 'blog/' . $node->uid)));
+  }
+  return $node;
+}
+
+/**
+ * Implement hook_node_view().
+ */
+function blog_node_view($node, $build_mode = 'full') {
+  if ($build_mode != 'rss') {
+    if ($node->type == 'blog' && arg(0) != 'blog' || arg(1) != $node->uid) {
+      $links['blog_usernames_blog'] = array(
+        'title' => t("!username's blog", array('!username' => $node->name)),
+        'href' => "blog/$node->uid",
+        'attributes' => array('title' => t("Read !username's latest blog entries.", array('!username' => $node->name))),
+      );
+      $node->content['links']['blog'] = array(
+        '#theme' => 'links',
+        '#links' => $links,
+        '#attributes' => array('class' => 'links inline'),
+      );
+    }
+  }
+}
+
+/**
+ * Implement hook_menu().
+ */
+function blog_menu() {
+  $items['blog'] = array(
+    'title' => 'Blogs',
+    'page callback' => 'blog_page_last',
+    'access arguments' => array('access content'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+  $items['blog/%user_uid_optional'] = array(
+    'title' => 'My blog',
+    'page callback' => 'blog_page_user',
+    'page arguments' => array(1),
+    'access callback' => 'blog_page_user_access',
+    'access arguments' => array(1),
+  );
+  $items['blog/%user/feed'] = array(
+    'title' => 'Blogs',
+    'page callback' => 'blog_feed_user',
+    'page arguments' => array(1),
+    'access callback' => 'blog_page_user_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['blog/feed'] = array(
+    'title' => 'Blogs',
+    'page callback' => 'blog_feed_last',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Access callback for user blog pages.
+ */
+function blog_page_user_access($account) {
+  // The visitor must be able to access the site's content.
+  // For a blog to 'exist' the user must either be able to
+  // create new blog entries, or it must have existing posts.
+  return $account->uid && user_access('access content') && (user_access('create blog content', $account) || _blog_post_exists($account));
+}
+
+/**
+ * Helper function to determine if a user has blog posts already.
+ */
+function _blog_post_exists($account) {
+  return (bool)db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('type', 'blog')
+    ->condition('uid', $account->uid)
+    ->condition('status', 1)
+    ->range(0, 1)
+    ->addTag('node_access')
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Implement hook_block_list().
+ */
+function blog_block_list() {
+  $block['recent']['info'] = t('Recent blog posts');
+  return $block;
+}
+
+/**
+ * Implement hook_block_view().
+ *
+ * Displays the most recent 10 blog titles.
+ */
+function blog_block_view($delta = '') {
+  global $user;
+
+  if (user_access('access content')) {
+    $result = db_select('node', 'n')
+      ->fields('n', array('nid', 'title', 'created'))
+      ->condition('type', 'blog')
+      ->condition('status', 1)
+      ->orderBy('created', 'DESC')
+      ->range(0, 10)
+      ->addTag('node_access')
+      ->execute();
+
+    if ($node_title_list = node_title_list($result)) {
+      $block['content'] = $node_title_list;
+      $block['content'] .= theme('more_link', url('blog'), t('Read the latest blog entries.'));
+      $block['subject'] = t('Recent blog posts');
+      return $block;
+    }
+  }
+}
+

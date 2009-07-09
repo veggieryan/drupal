@@ -1,0 +1,19 @@
+; $Id: update.info,v 1.5 2008/10/11 02:33:12 webchick Exp $
+name = Update status
+description = Checks the status of available updates for Drupal and your installed modules and themes.
+version = VERSION
+package = Core
+core = 7.x
+files[] = update.module
+files[] = update.compare.inc
+files[] = update.fetch.inc
+files[] = update.report.inc
+files[] = update.settings.inc
+files[] = update.install
+
+; Information added by drupal.org packaging script on 2009-07-09
+version = "7.x-dev"
+core = "7.x"
+project = "drupal"
+datestamp = "1247141516"
+

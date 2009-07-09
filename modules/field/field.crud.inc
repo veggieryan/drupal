@@ -1,0 +1,690 @@
+<?php
+// $Id: field.crud.inc,v 1.19 2009/07/04 06:19:46 dries Exp $
+
+/**
+ * @file
+ * Field CRUD API, handling field and field instance creation and deletion.
+ */
+
+/**
+ * @defgroup field_structs Field API data structures
+ * @{
+ * Represent Field API fields and instances.
+ *
+ * The Field API defines two primary data structures, Field and
+ * Instance, and the concept of a Bundle. A Field defines a
+ * particular type of data that can be attached to objects. A Field
+ * Instance is a Field attached to a single Bundle. A Bundle is a set
+ * of fields that are treated as a group by the Field Attach API.
+ *
+ * For example, suppose a site administrator wants Article nodes to
+ * have a subtitle and photo. Using the Field API or some UI module,
+ * the administrator creates a field named 'subtitle' of type 'text'
+ * and a field named 'photo' of type 'image'. The administrator
+ * (again, via a UI) creates two Field Instances, one attaching the
+ * field 'subtitle' to the bundle 'article' and one attaching the field
+ * 'photo' to the bundle 'article'. When the node system uses the
+ * Field Attach API to load all fields for an Article node, it passes
+ * the node's content type (which is 'article') as the node's bundle.
+ * field_attach_load() then loads the 'subtitle' and 'photo' fields
+ * because they are both attached to the bundle 'article'.
+ *
+ * Field objects are (currently) represented as an array of key/value
+ * pairs. The object properties are:
+ *
+ * @param array $field:
+ * - id (integer, read-only)
+ *     The primary identifier of the field. It is assigned automatically
+ *     by field_create_field().
+ * - field_name (string)
+ *     The name of the field. Each field name is unique within Field API.
+ *     When a field is attached to an object, the field's data is stored
+ *     in $object->$field_name.
+ * - type (string)
+ *     The type of the field, such as 'text' or 'image'. Field types
+ *     are defined by modules that implement hook_field_info().
+ * - cardinality (integer)
+ *     The number of values the field can hold. Legal values are any
+ *     positive integer or FIELD_CARDINALITY_UNLIMITED.
+ * - locked (integer)
+ *     TODO: undefined.
+ * - module (string, read-only)
+ *     The name of the module that implements the field type.
+ * - active (integer, read-only)
+ *     TRUE if the module that implements the field type is currently
+ *     enabled, FALSE otherwise.
+ * - deleted (integer, read-only)
+ *     TRUE if this field has been deleted, FALSE otherwise. Deleted
+ *     fields are ignored by the Field Attach API. This property exists
+ *     because fields can be marked for deletion but only actually
+ *     destroyed by a separate garbage-collection process.
+ * - columns (array, read-only).
+ *     An array of the Field API columns used to store each value of
+ *     this field. The column list may depend on field settings; it is
+ *     not constant per field type. Field API column specifications are
+ *     exactly like Schema API column specifications but, depending on
+ *     the field storage module in use, the name of the column may not
+ *     represent an actual column in an SQL database.
+ * - indexes (array).
+ *     An array of indexes on data columns, using the same definition format
+ *     as Schema API index specifications. Only columns that appear in the
+ *     'columns' setting are allowed. Note that field types can specify
+ *     default indexes, which can be modified or added to when
+ *     creating a field.
+ * - settings (array)
+ *     A sub-array of key/value pairs of field-type-specific settings. Each
+ *     field type module defines and documents its own field settings.
+ *
+ * Field Instance objects are (currently) represented as an array of
+ * key/value pairs. The object properties are:
+ *
+ * @param array $instance:
+ * - id (integer, read-only)
+ *     The primary identifier of this field instance. It is assigned
+ *     automatically by field_create_instance().
+ * - field_id (integer, read-only)
+ *     The foreign key of the field attached to the bundle by this instance.
+ *     It is populated automatically by field_create_instance().
+ * - field_name (string)
+ *     The name of the field attached to the bundle by this instance.
+ * - bundle (string)
+ *     The name of the bundle that the field is attached to.
+ * - label (string)
+ *     A human-readable label for the field when used with this
+ *     bundle. For example, the label will be the title of Form API
+ *     elements for this instance.
+ * - description (string)
+ *     A human-readable description for the field when used with this
+ *     bundle. For example, the description will be the help text of
+ *     Form API elements for this instance.
+ * - weight (float)
+ *     The order in which the field should be sorted relative
+ *     to other fields when used with this bundle. The weight affects
+ *     ordering in both forms (see field_attach_form()) and rendered output
+ *     (see field_attach_view()).
+ *     TODO - this should probably become a context setting so that
+ *     the weight can be different in the form and in various other
+ *     contexts.
+ * - required (integer)
+ *     TRUE if a value for this field is required when used with this
+ *     bundle, FALSE otherwise. Currently, required-ness is only enforced
+ *     during Form API operations, not by field_attach_load(),
+ *     field_attach_insert(), or field_attach_update().
+ * - default_value_function (string)
+ *     The name of the function, if any, that will provide a default value.
+ * - deleted (integer, read-only)
+ *     TRUE if this instance has been deleted, FALSE otherwise.
+ *     Deleted instances are ignored by the Field Attach API.
+ *     This property exists because instances can be marked for deletion but
+ *     only actually destroyed by a separate garbage-collection process.
+ * - settings (array)
+ *     A sub-array of key/value pairs of field-type-specific instance
+ *     settings. Each field type module defines and documents its own
+ *     instance settings.
+ * - widget (array)
+ *     A sub-array of key/value pairs identifying the Form API input widget
+ *     for the field when used by this bundle.
+ *     - type (string)
+ *         The type of the widget, such as text_textfield. Widget types
+ *         are defined by modules that implement hook_field_widget_info().
+ *     - module (string, read-only)
+ *         The name of the module that implements the widget type.
+ *     - active (integer, read-only)
+ *         TRUE if the module that implements the widget type is currently
+ *         enabled, FALSE otherwise.
+ *     - settings (array)
+ *         A sub-array of key/value pairs of widget-type-specific settings.
+ *         Each field widget type module defines and documents its own
+ *         widget settings.
+ * - display (array)
+ *     A sub-array of key/value pairs identifying build modes and the way the
+ *     field values should be displayed in each build mode.
+ *     - full (array)
+ *         A sub-array of key/value pairs of the display options to be used
+ *         when the field is being displayed in the "full" build mode.
+ *         - label (string)
+ *             Position of the label. 'inline', 'above' and 'hidden' are the
+ *             values recognized by the default 'field' theme implementation.
+ *         - type (string)
+ *             The type of the display formatter, or 'hidden' for no display.
+ *         - settings (array)
+ *             A sub-array of key/value pairs of display options specific to
+ *             the formatter.
+ *         - module (string, read-only)
+ *             The name of the module which implements the display formatter.
+ *     - teaser
+ *         - ...
+ *     - other_build_mode
+ *        - ...
+ *
+ * TODO D7 : document max length for field types, widget types,
+ * formatter names...
+ */
+/**
+ * @} End of "defgroup field_structs".
+ */
+
+/**
+ * @defgroup field_crud Field CRUD API
+ * @{
+ * Create, update, and delete Field API fields, bundles, and instances.
+ *
+ * Modules use this API, often in hook_install(), to create custom
+ * data structures. UI modules will use it to create a user interface.
+ *
+ * The Field CRUD API uses
+ * @link field_structs Field API data structures @endlink.
+ */
+
+/**
+ * Create a field.
+ *
+ * This function does not bind the field to any bundle; use
+ * field_create_instance() for that.
+ *
+ * @param $field
+ *   A field structure. The field_name and type properties are required.
+ *   Other properties, if omitted, will be given the following default values:
+ *   - cardinality: 1
+ *   - locked: FALSE
+ *   - indexes: the field-type indexes, specified by the field type's
+ *     hook_field_schema(). The indexes specified in $field are added
+ *     to those default indexes. It is possible to override the
+ *     definition of a field-type index by providing an index with the
+ *     same name, or to remove it by redefining it as an empty array
+ *     of columns. Overriding field-type indexes should be done
+ *     carefully, for it might seriously affect the site's performance.
+ *   - settings: each omitted setting is given the default value defined in
+ *     hook_field_info().
+ * @return
+ *   The $field structure with the id property filled in.
+ * @throw
+ *   FieldException
+ */
+function field_create_field($field) {
+  // Field name is required.
+  if (empty($field['field_name'])) {
+    throw new FieldException('Attempt to create an unnamed field.');
+  }
+  // Field type is required.
+  if (empty($field['type'])) {
+    throw new FieldException('Attempt to create a field with no type.');
+  }
+  // Field name cannot contain invalid characters.
+  if (preg_match('/[^a-z0-9_]/', $field['field_name'])) {
+    throw new FieldException('Attempt to create a field with invalid characters. Only alphanumeric characters and underscores are allowed.');
+  }
+
+  // TODO: check that field_name < 32 chars.
+
+  // Check that the field type is known.
+  $field_type = field_info_field_types($field['type']);
+  if (!$field_type) {
+    throw new FieldException(t('Attempt to create a field of unknown type %type.', array('%type' => $field['type'])));
+  }
+
+  // Ensure the field name is unique over active and disabled fields.
+  // We do not care about deleted fields.
+  // TODO : do we want specific messages when clashing with a disabled or inactive field ?
+  $prior_field = field_read_field($field['field_name'], array('include_inactive' => TRUE));
+  if (!empty($prior_field)) {
+    throw new FieldException(t('Attempt to create field name %name which already exists.', array('%name' => $field['field_name'])));
+  }
+
+  $field += array(
+    'cardinality' => 1,
+    'locked' => FALSE,
+    'settings' => array(),
+  );
+  // Create all per-field-type properties (needed here as long as we have
+  // settings that impact column definitions).
+  $field['settings'] += field_info_field_settings($field['type']);
+  $field['module'] = $field_type['module'];
+  $field['active'] = 1;
+  $field['deleted'] = 0;
+
+  // Collect storage information.
+  $schema = (array) module_invoke($field['module'], 'field_schema', $field);
+  $schema += array('columns' => array(), 'indexes' => array());
+
+  // 'columns' are hardcoded in the field type.
+  $field['columns'] = $schema['columns'];
+
+  // 'indexes' can be both hardcoded in the field type, and specified in the
+  // incoming $field definition.
+  $field += array(
+    'indexes' => array(),
+  );
+  $field['indexes'] += $schema['indexes'];
+
+  // The serialized 'data' column contains everything from $field that does not
+  // have its own column and is not automatically populated when the field is
+  // read.
+  $data = $field;
+  unset($data['columns'], $data['field_name'], $data['type'], $data['locked'], $data['module'], $data['cardinality'], $data['active'], $data['deleted']);
+  $field['data'] = $data;
+
+  // Store the field and create the id.
+  drupal_write_record('field_config', $field);
+
+  // Invoke hook_field_storage_create_field after the field is
+  // complete (e.g. it has its id).
+  module_invoke(variable_get('field_storage_module', 'field_sql_storage'), 'field_storage_create_field', $field);
+
+  // Clear caches
+  field_cache_clear(TRUE);
+
+  // Invoke external hooks after the cache is cleared for API consistency.
+  module_invoke_all('field_create_field', $field);
+  
+  return $field;
+}
+
+/**
+ * Read a single field record directly from the database. Generally,
+ * you should use the field_info_field() instead.
+ *
+ * This function will not return deleted fields. Use
+ * field_read_fields() instead for this purpose.
+ *
+ * @param $field_name
+ *   The field name to read.
+ * @param array $include_additional
+ *   The default behavior of this function is to not return a field that
+ *   is inactive. Setting
+ *   $include_additional['include_inactive'] to TRUE will override this
+ *   behavior.
+ * @return
+ *   A field structure, or FALSE.
+ */
+function field_read_field($field_name, $include_additional = array()) {
+  $fields = field_read_fields(array('field_name' => $field_name), $include_additional);
+  return $fields ? current($fields) : FALSE;
+}
+
+/**
+ * Read in fields that match an array of conditions.
+ *
+ * @param array $params
+ *   An array of conditions to match against.
+ * @param array $include_additional
+ *   The default behavior of this function is to not return fields that
+ *   are inactive or have been deleted. Setting
+ *   $include_additional['include_inactive'] or
+ *   $include_additional['include_deleted'] to TRUE will override this
+ *   behavior.
+ * @return
+ *   An array of fields matching $params. If
+ *   $include_additional['include_deletd'] is TRUE, the array is keyed
+ *   by field id, otherwise it is keyed by field name.
+ */
+function field_read_fields($params = array(), $include_additional = array()) {
+  $query = db_select('field_config', 'fc', array('fetch' => PDO::FETCH_ASSOC));
+  $query->fields('fc');
+
+  // Turn the conditions into a query.
+  foreach ($params as $key => $value) {
+    $query->condition($key, $value);
+  }
+  if (!isset($include_additional['include_inactive']) || !$include_additional['include_inactive']) {
+    $query->condition('fc.active', 1);
+  }
+  $include_deleted = (isset($include_additional['include_deleted']) && $include_additional['include_deleted']);
+  if (!$include_deleted) {
+    $query->condition('fc.deleted', 0);
+  }
+
+  $fields = array();
+  $results = $query->execute();
+  foreach ($results as $field) {
+    // Extract serialized data.
+    $data = unserialize($field['data']);
+    unset($field['data']);
+    $field += $data;
+
+    module_invoke_all('field_read_field', $field);
+
+    // Populate storage information.
+    $schema = (array) module_invoke($field['module'], 'field_schema', $field);
+    $schema += array('columns' => array(), 'indexes' => array());
+    $field['columns'] = $schema['columns'];
+
+    $field_name = $field['field_name'];
+    if ($include_deleted) {
+      $field_name = $field['id'];
+    }
+    $fields[$field_name] = $field;
+  }
+  return $fields;
+}
+
+/**
+ * Mark a field for deletion, including all its instances and all data
+ * associated with it.
+ *
+ * @param $field_name
+ *   The field name to delete.
+ */
+function field_delete_field($field_name) {
+  // Mark field storage for deletion.
+  module_invoke(variable_get('field_storage_module', 'field_sql_storage'), 'field_storage_delete_field', $field_name);
+
+  // Mark any instances of the field for deletion.
+  db_update('field_config_instance')
+    ->fields(array('deleted' => 1))
+    ->condition('field_name', $field_name)
+    ->execute();
+
+  // Mark the field for deletion.
+  db_update('field_config')
+    ->fields(array('deleted' => 1))
+    ->condition('field_name', $field_name)
+    ->execute();
+
+  // Clear the cache.
+  field_cache_clear(TRUE);
+}
+
+/**
+ * Creates an instance of a field, binding it to a bundle.
+ *
+ * @param $instance
+ *   A field instance structure. The field_name and bundle properties are
+ *   required.
+ *   Other properties, if omitted, will be given the following default values:
+ *   - label: the field name
+ *   - description: empty string
+ *   - weight: 0
+ *   - required: FALSE
+ *   - default_value_function: empty string
+ *   - settings: each omitted setting is given the default value specified in
+ *     hook_field_info().
+ *   - widget:
+ *     - type: the default widget specified in hook_field_info().
+ *     - settings: each omitted setting is given the default value specified in
+ *       hook_field_widget_info().
+ *   - display:
+ *     Settings for the 'full' build mode will be added, and each build mode
+ *     will be completed with the follwong default values:
+ *     - label: 'above'
+ *     - type: the default formatter specified in hook_field_info().
+ *     - settings: each omitted setting is given the default value specified in
+ *       hook_field_formatter_info().
+ * @return
+ *   The $instance structure with the id property filled in.
+ * @throw
+ *   FieldException
+ */
+function field_create_instance($instance) {
+  // Check that the specified field exists.
+  $field = field_read_field($instance['field_name']);
+  if (empty($field)) {
+    throw new FieldException("Attempt to create an instance of a field that doesn't exist.");
+  }
+
+  // Set the field id.
+  $instance['field_id'] = $field['id'];
+
+  // Note that we do *not* prevent creating a field on non-existing bundles,
+  // because that would break the 'Body as field' upgrade for contrib
+  // node types.
+
+  // TODO: Check that the widget type is known and can handle the field type ?
+  // TODO: Check that the formatters are known and can handle the field type ?
+  // TODO: Check that the display build modes are known for the object type ?
+  // Those checks should probably happen in _field_write_instance() ?
+  // Problem : this would mean that a UI module cannot update an instance with a disabled formatter.
+
+  // Ensure the field instance is unique.
+  // TODO : do we want specific messages when clashing with a disabled or inactive instance ?
+  $prior_instance = field_read_instance($instance['field_name'], $instance['bundle'], array('include_inactive' => TRUE));
+  if (!empty($prior_instance)) {
+    throw new FieldException('Attempt to create a field instance which already exists.');
+  }
+
+  _field_write_instance($instance);
+
+  // Clear caches
+  field_cache_clear();
+
+  // Invoke external hooks after the cache is cleared for API consistency.
+  module_invoke_all('field_create_instance', $instance);
+
+  return $instance;
+}
+
+/*
+ * Update an instance of a field.
+ *
+ * @param $instance
+ *   An associative array represeting an instance structure. The required
+ *   keys and values are:
+ *     field_name: The name of an existing field.
+ *     bundle: The bundle this field belongs to.
+ *   Read-only_id properties are assigned automatically. Any other
+ *   properties specified in $instance overwrite the existing values for
+ *   the instance.
+ * @throw
+ *   FieldException
+ * @see field_create_instance()
+ */
+function field_update_instance($instance) {
+  // Check that the specified field exists.
+  $field = field_read_field($instance['field_name']);
+  if (empty($field)) {
+    throw new FieldException("Attempt to update an instance of a nonexistent field.");
+  }
+
+  // Check that the field instance exists (even if it is inactive, since we
+  // want to be able to replace inactive widgets with new ones).
+  $prior_instance = field_read_instance($instance['field_name'], $instance['bundle'], array('include_inactive' => TRUE));
+  if (empty($prior_instance)) {
+    throw new FieldException("Attempt to update a field instance that doesn't exist.");
+  }
+
+  $instance['id'] = $prior_instance['id'];
+  $instance['field_id'] = $prior_instance['field_id'];
+
+  _field_write_instance($instance, TRUE);
+
+  // Clear caches.
+  field_cache_clear();
+}
+
+/**
+ * Store an instance record in the field configuration database.
+ *
+ * @param $instance
+ *   An instance structure.
+ * @param $update
+ *   Whether this is a new or existing instance.
+ */
+function _field_write_instance($instance, $update = FALSE) {
+  $field = field_read_field($instance['field_name']);
+  $field_type = field_info_field_types($field['type']);
+
+  // Set defaults.
+  $instance += array(
+    'settings' => array(),
+    'display' => array(),
+    'widget' => array(),
+    'required' => FALSE,
+    'label' => $instance['field_name'],
+    'description' => '',
+    'weight' => 0,
+    'deleted' => 0,
+  );
+
+  // Set default instance settings.
+  $instance['settings'] += field_info_instance_settings($field['type']);
+
+  // Set default widget and settings.
+  $instance['widget'] += array(
+    // TODO: what if no 'default_widget' specified ?
+    'type' => $field_type['default_widget'],
+    'settings' => array(),
+  );
+  // Check widget module.
+  $widget_type = field_info_widget_types($instance['widget']['type']);
+  $widget_module = $widget_type['module'];
+  $widget_active = module_exists($widget_module);
+  $instance['widget']['settings'] += field_info_widget_settings($instance['widget']['type']);
+  $instance['widget']['module'] = $widget_module;
+  $instance['widget']['active'] = $widget_active;
+
+  // Make sure there is at least display info for the 'full' build mode.
+  $instance['display'] += array(
+    'full' => array(),
+  );
+  // Set default display settings for each build mode.
+  foreach ($instance['display'] as $build_mode => $display) {
+    $instance['display'][$build_mode] += array(
+      'label' => 'above',
+      // TODO: what if no 'default_formatter' specified ?
+      'type' => $field_type['default_formatter'],
+      'settings' => array(),
+    );
+    $formatter_type = field_info_formatter_types($instance['display'][$build_mode]['type']);
+    // TODO : 'hidden' will raise PHP warnings.
+    $instance['display'][$build_mode]['module'] = $formatter_type['module'];
+    $instance['display'][$build_mode]['settings'] += field_info_formatter_settings($instance['display'][$build_mode]['type']);
+  }
+
+  // The serialized 'data' column contains everything from $instance that does
+  // not have its own column and is not automatically populated when the
+  // instance is read.
+  $data = $instance;
+  unset($data['id'], $data['field_id'], $data['field_name'], $data['bundle'], $data['widget']['type'], $data['weight'], $data['deleted']);
+
+  $record = array(
+    'field_id' => $instance['field_id'],
+    'field_name' => $instance['field_name'],
+    'bundle' => $instance['bundle'],
+    'widget_type' => $instance['widget']['type'],
+    'widget_module' => $widget_module,
+    'widget_active' => $widget_active,
+    'weight' => $instance['weight'],
+    'data' => $data,
+    'deleted' => $instance['deleted'],
+  );
+  // We need to tell drupal_update_record() the primary keys to trigger an
+  // update.
+  if ($update) {
+    $record['id'] = $instance['id'];
+    $primary_key = array('id');
+  }
+  else {
+    $primary_key = array();
+  }
+  drupal_write_record('field_config_instance', $record, $primary_key);
+}
+
+/**
+ * Read a single instance record directly from the database. Generally,
+ * you should use the field_info_instance() instead.
+ *
+ * This function will not return deleted instances. Use
+ * field_read_instances() instead for this purpose.
+ *
+ * @param $field_name
+ *   The field name to read.
+ * @param $bundle
+ *   The bundle to which the field is bound.
+ * @param array $include_additional
+ *   The default behavior of this function is to not return an instance that
+ *   is inactive. Setting
+ *   $include_additional['include_inactive'] to TRUE will override this
+ *   behavior.
+ * @return
+ *   An instance structure, or FALSE.
+ */
+function field_read_instance($field_name, $bundle, $include_additional = array()) {
+  $instances = field_read_instances(array('field_name' => $field_name, 'bundle' => $bundle), $include_additional);
+  return $instances ? current($instances) : FALSE;
+}
+
+/**
+ * Read in field instances that match an array of conditions.
+ *
+ * @param $param
+ *   An array of properties to use in selecting a field
+ *   instance. Valid keys include any column of the
+ *   field_config_instance table. If NULL, all instances will be returned.
+ * @param $include_additional
+ *   The default behavior of this function is to not return field
+ *   instances that are inactive or have been marked deleted. Setting
+ *   $include_additional['include_inactive'] or
+ *   $include_additional['include_deleted'] to TRUE will override this
+ *   behavior.
+ * @return
+ *   An array of instances matching the arguments.
+ */
+function field_read_instances($params = array(), $include_additional = array()) {
+  $query = db_select('field_config_instance', 'fci', array('fetch' => PDO::FETCH_ASSOC));
+  $query->join('field_config', 'fc', 'fc.id = fci.field_id');
+  $query->fields('fci');
+  #$query->fields('fc', array('type'));
+
+  // Turn the conditions into a query.
+  foreach ($params as $key => $value) {
+    $query->condition('fci.' . $key, $value);
+  }
+  $query->condition('fc.active', 1);
+  if (!isset($include_additional['include_inactive']) || !$include_additional['include_inactive']) {
+    $query->condition('fci.widget_active', 1);
+  }
+  if (!isset($include_additional['include_deleted']) || !$include_additional['include_deleted']) {
+    $query->condition('fc.deleted', 0);
+    $query->condition('fci.deleted', 0);
+  }
+
+  $instances = array();
+  $results = $query->execute();
+
+  foreach ($results as $record) {
+    $instance = unserialize($record['data']);
+    $instance['id'] = $record['id'];
+    $instance['field_id'] = $record['field_id'];
+    $instance['field_name'] = $record['field_name'];
+    $instance['bundle'] = $record['bundle'];
+    $instance['weight'] = $record['weight'];
+    $instance['deleted'] = $record['deleted'];
+    $instance['widget']['type'] = $record['widget_type'];
+    $instance['widget']['module'] = $record['widget_module'];
+    $instance['widget']['active'] = $record['widget_active'];
+
+    // TODO D7 : Set default widget settings, default instance settings, default display settings.
+    // (the modules that defined them might have changed since the instance was last saved).
+
+    module_invoke_all('field_read_instance', $instance);
+    $instances[] = $instance;
+  }
+  return $instances;
+}
+
+/**
+ * Mark a field instance for deletion, including all data associated with
+ * it.
+ *
+ * @param $field_name
+ *   The name of the field whose instance will be deleted.
+ * @param $bundle
+ *   The bundle for the instance which will be deleted.
+ */
+function field_delete_instance($field_name, $bundle) {
+  // Mark the field instance for deletion.
+  db_update('field_config_instance')
+    ->fields(array('deleted' => 1))
+    ->condition('field_name', $field_name)
+    ->condition('bundle', $bundle)
+    ->execute();
+
+  // Mark all data associated with the field for deletion.
+  module_invoke(variable_get('field_storage_module', 'field_sql_storage'), 'field_storage_delete_instance', $field_name, $bundle);
+  // Clear the cache.
+  field_cache_clear();
+}
+
+/**
+ * @} End of "defgroup field_crud".
+ */

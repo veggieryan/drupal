@@ -1,0 +1,46 @@
+<?php
+// $Id: php.install,v 1.8 2009/05/27 18:33:59 dries Exp $
+
+/**
+ * @file
+ * Install, update and uninstall functions for the php module.
+ */
+
+/**
+ * Implement hook_install().
+ */
+function php_install() {
+  $format_exists = (bool) db_query_range('SELECT 1 FROM {filter_format} WHERE name = :name', array(':name' => 'PHP code'), 0, 1)->fetchField();
+  // Add a PHP code text format, if it does not exist. Do this only for the
+  // first install (or if the format has been manually deleted) as there is no
+  // reliable method to identify the format in an uninstall hook or in
+  // subsequent clean installs.
+  if (!$format_exists) {
+    $format = db_insert('filter_format')
+      ->fields(array(
+        'name' => 'PHP code',
+        'roles' => '',
+        'cache' => 0,
+      ))
+      ->execute();
+
+    // Enable the PHP evaluator filter.
+    db_insert('filter')
+      ->fields(array(
+        'format' => $format,
+        'module' => 'php',
+        'delta' => 0,
+        'weight' => 0,
+      ))
+      ->execute();
+
+    drupal_set_message(t('A !php-code text format has been created.', array('!php-code' => l('PHP code', 'admin/settings/filter/' . $format))));
+  }
+}
+
+/**
+ * Implement hook_disable().
+ */
+function php_disable() {
+  drupal_set_message(t('The PHP module has been disabled. Please note that any existing content that was using the PHP filter will now be visible in plain text. This might pose a security risk by exposing sensitive information, if any, used in the PHP code.'));
+}

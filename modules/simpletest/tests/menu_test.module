@@ -1,0 +1,58 @@
+<?php
+// $Id: menu_test.module,v 1.5 2009/05/27 18:34:00 dries Exp $
+
+/**
+ * @file
+ * Dummy module implementing hook menu.
+ */
+
+/**
+ * Implement hook_menu().
+ */
+function menu_test_menu() {
+  // The name of the menu changes during the course of the test. Using a $_GET.
+  $items['menu_name_test'] = array(
+    'title' => 'Test menu_name router item',
+    'page callback' => 'node_save',
+    'menu_name' => isset($_GET["hook_menu_name"]) ? $_GET["hook_menu_name"] : 'original',
+  );
+  // Use FALSE as 'title callback' to bypass t().
+  $items['menu_no_title_callback'] = array(
+    'title' => 'A title with @placeholder',
+    'title callback' => FALSE,
+    'title arguments' => array('@placeholder' => 'some other text'),
+    'page callback' => 'menu_test_callback',
+    'access arguments' => array('access content'),
+  );
+
+  // Hidden link for menu_link_maintain tests
+  $items['menu_test_maintain/%'] = array(
+    'title' => 'Menu maintain test',
+    'page callback' => 'node_page_default',
+    'access arguments' => array('access content'),
+   );
+  // Hierarchical tests.
+  $items['menu-test/hierarchy/parent'] = array(
+    'title' => 'Parent menu router',
+    'page callback' => 'node_page_default',
+  );
+  $items['menu-test/hierarchy/parent/child'] = array(
+    'title' => 'Child menu router',
+    'page callback' => 'node_page_default',
+  );
+  $items['menu-test/hierarchy/parent/child2/child'] = array(
+    'title' => 'Unattached subchild router',
+    'page callback' => 'node_page_default',
+  );
+  return $items;
+}
+
+/**
+ * Dummy callback for hook_menu() to point to.
+ *
+ * @return
+ *  A random string.
+ */
+function menu_test_callback() {
+  return $this->randomName();
+}
