@@ -1,15 +1,52 @@
-// $Id: CHANGELOG.txt,v 1.76.2.34 2009/03/09 01:35:53 sun Exp $
+// $Id: CHANGELOG.txt,v 1.145 2009/06/10 01:17:32 sun Exp $
 
 Wysiwyg x.x-x.x, xxxx-xx-xx
 ---------------------------
 
 
-Wysiwyg 6.x-1.x, xxxx-xx-xx
+Wysiwyg 6.x-3.x, xxxx-xx-xx
 ---------------------------
 
 
-Wysiwyg 6.x-1.1, 2009-03-09
+Wysiwyg 6.x-2.0, 2009-06-10
 ---------------------------
+#474908 by TwoD: Fixed Teaser break causing error in IE8.
+by sun: Major code clean-up.
+#331089 by wwalc: Fixed FCKeditor toolbar buttons do not wrap.
+#407014 by sun: Fixed/removed migration from other editor integration modules.
+#485264 by sun: Changed installation instructions to be more concise.
+#479514 by sun: Fixed native plugin loading for TinyMCE (follow-up).
+#434590 by sun: Fixed path admin/settings/wysiwyg not found.
+#479514 by TwoD, sun: Added native plugin support for FCKeditor.
+#341054 by sun: Fixed toggle link configuration setting not working.
+by sun: Fixed markItUp button icons are not displayed.
+by sun: Added openWYSIWYG editor support.
+#362137 by jfh, sun: Fixed WYMeditor broken when JS/CSS aggregation is enabled.
+#328252 by sun: Added TinyMCE plugin BBCode for 3.x.
+#429926 by TwoD, sun: Fixed TinyMCE broken due to renamed Flash/Media plugin.
+#342864 by davexoxide, sun: Added YUI editor support.
+#332139 by sun: Fixed editor must not be changed when profile is configured.
+#362137 by jfh: Added WYMeditor support.
+#470928 by jfh, sun: Fixed Drupal.wysiwyg.clone turns arrays into objects.
+#445826 by TwoD: Fixed FCKeditor: Drupal.wysiwyg.activeId not updated.
+#478324 by jeffschuler: Fixed typo in profile configuration form.
+#373542 by sun: Fixed encoding of HTML entities for certain languages.
+#320562 by sun: Changed location for external editor libraries.
+#449134 by sun: Fixed stylesheets of theme missing in node form previews.
+
+
+Wysiwyg 6.x-2.0-ALPHA1, 2009-05-17
+----------------------------------
+#403728 by jfduchesneau: Fixed none.js breaks if textarea.js is not loaded.
+#454992 by sun: Fixed drupal_get_js() query string 'q' breaks plugin loading.
+#419696 by sun: Fixed native plugins plugins are not loaded for all profiles.
+#414768 by sun: Fixed Wysiwyg API not working in Konqueror.
+#293803 by sun: Fixed "Show summary in full view" checkbox not displayed.
+#416742 by sun: Fixed type casting of $profile in profile configuration form.
+#404532 by TwoD: Fixed Teaser break comment stripped in IE.
+#380698 by TwoD: Added Drupal plugin support for FCKeditor.
+#380698 by TwoD, sun: Added Drupal plugin support for FCKeditor (part I).
+#398848 by sun: Added support for TinyMCE 3.1.
 #394068 by StephaneC: markItUp: Fixed icons not displayed due to #385736.
 #385974 by sun: Fixed form element description for CSS path (for Define CSS).
 #390460 by sun: Fixed broken plugin loading due to #359626.
@@ -21,18 +58,19 @@ Wysiwyg 6.x-1.1, 2009-03-09
 #369115 by sun: Fixed TinyMCE's URL conversion magic breaks some input filters.
 #376400 by TwoD: Fixed bad grammar in help text on profile overview page.
 #367632 by sun: Fixed $this and i JavaScript variables defined in global scope.
-
-
-Wysiwyg 6.x-1.0, 2009-02-13
----------------------------
 #319363 by sun: Fixed missing spacer.gif for Teaser break plugin.
 #373672 by chawl: Added (native) xhtmlextras plugin for TinyMCE 3.
 #287025 by sun: Fixed native editor plugin options for TinyMCE and FCKeditor.
 #373542 by sun: Fixed TinyMCE: entity_encoding 'raw' removes HTML entities.
 #372806 by sun: Fixed block format configuration form element description.
+#370277 by sun: Fixed "Uncaught SyntaxError: Unexpected token" in IE/Chrome.
 #367632 by sun: Fixed "Unexpected identifier, string or number" error in IE.
 #367632 by sun: Fixed invalid JavaScript syntax.
 #319363 by sun: Follow-up: Synced 1.x with 2.x where possible.
+#319363 by sun, quicksketch: Rewrote editor plugin API.  The new plugin API
+  allows Drupal modules to expose editor plugins for ANY editor without
+  implementing editor-specific code.  Major milestone for better content-editing
+  in Drupal.
 #364782 by sun: Fixed theme stylesheets not properly loaded.
 #352938 by sun: Fixed JS error (blank page) in IE when plugins are loaded.
 #331089 by wwalc, sun: Added custom toolbar configuration support for FCKeditor.
