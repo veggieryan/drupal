@@ -18,7 +18,6 @@ ErrorDocument 404 /index.php
 
 # Force simple error message for requests for non-existent favicon.ico.
 <Files favicon.ico>
-  # There is no end quote below, for compatibility with Apache 1.3.
   ErrorDocument 404 "The requested file favicon.ico was not found.
 </Files>
 
@@ -62,10 +61,8 @@ DirectoryIndex index.php
 <IfModule mod_expires.c>
   # Enable expirations.
   ExpiresActive On
-
   # Cache all files for 2 weeks after access (A).
   ExpiresDefault A1209600
-
   # Do not cache dynamically generated pages.
   ExpiresByType text/html A1
 </IfModule>
@@ -100,11 +97,23 @@ DirectoryIndex index.php
   # uncomment the following line:
   # RewriteBase /
 
-  # Rewrite URLs of the form 'x' to the form 'index.php?q=x'.
+  # Rewrite old-style URLs of the form 'node.php?id=x'.
+  #RewriteCond %{REQUEST_FILENAME} !-f
+  #RewriteCond %{REQUEST_FILENAME} !-d
+  #RewriteCond %{QUERY_STRING} ^id=([^&]+)$
+  #RewriteRule node.php index.php?q=node/view/%1 [L]
+
+  # Rewrite old-style URLs of the form 'module.php?mod=x'.
+  #RewriteCond %{REQUEST_FILENAME} !-f
+  #RewriteCond %{REQUEST_FILENAME} !-d
+  #RewriteCond %{QUERY_STRING} ^mod=([^&]+)$
+  #RewriteRule module.php index.php?q=%1 [L]
+
+  # Rewrite current-style URLs of the form 'x' to the form 'index.php?q=x'.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_URI} !=/favicon.ico
   RewriteRule ^(.*)$ index.php?q=$1 [L,QSA]
 </IfModule>
 
-# $Id: .htaccess,v 1.90.2.3 2008/12/10 20:04:08 goba Exp $
+# $Id: .htaccess,v 1.81.2.6 2009/02/26 07:03:29 drumm Exp $
